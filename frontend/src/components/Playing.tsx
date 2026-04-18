@@ -70,6 +70,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [showMenu, setShowMenu] = useState(false)
   const [showArc, setShowArc] = useState(false)
   const [cfm, setCfm] = useState(false)
+  const [pinScroll, setPinScroll] = useState(true)
 
   // Gallery
   const [showGenModal, setShowGenModal] = useState(false)
@@ -82,6 +83,57 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   // Display preferences
   const dp = useDisplayPrefs()
+
+  // Swipe gesture for panels
+  const rootRef = useRef<HTMLDivElement>(null)
+  const lastPanel = useRef<PanelId>('mem')
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+
+  // Track last opened panel
+  const openPanel = (id: PanelId | null) => {
+    if (id) lastPanel.current = id
+    setActivePanel(id)
+  }
+
+  // Reset pinScroll when generation starts
+  const prevGen = useRef(false)
+  useEffect(() => {
+    if (state.gen && !prevGen.current) setPinScroll(true)
+    prevGen.current = state.gen
+  }, [state.gen])
+
+  // Swipe handlers
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const onStart = (e: TouchEvent) => {
+      touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+    const onEnd = (e: TouchEvent) => {
+      if (!touchStart.current) return
+      const dx = e.changedTouches[0].clientX - touchStart.current.x
+      const dy = e.changedTouches[0].clientY - touchStart.current.y
+      const startX = touchStart.current.x
+      touchStart.current = null
+      if (Math.abs(dy) > Math.abs(dx)) return // vertical scroll, ignore
+      const w = window.innerWidth
+      // Swipe left from right edge → open panel
+      if (dx < -60 && startX > w - 35) {
+        openPanel(lastPanel.current)
+        return
+      }
+      // Swipe right while panel is open → close panel
+      if (dx > 60 && activePanel) {
+        setActivePanel(null)
+      }
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, [activePanel])
 
   const memCount = state.summaries.length + state.lore.length
 
@@ -129,11 +181,11 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 
       switch (e.key) {
-        case '1': setActivePanel(p => p === 'mem' ? null : 'mem'); break
-        case '2': setActivePanel(p => p === 'gallery' ? null : 'gallery'); break
-        case '3': setActivePanel(p => p === 'track' ? null : 'track'); break
-        case '4': setActivePanel(p => p === 'settings' ? null : 'settings'); break
-        case '5': setActivePanel(p => p === 'ai' ? null : 'ai'); break
+        case '1': openPanel(activePanel === 'mem' ? null : 'mem'); break
+        case '2': openPanel(activePanel === 'gallery' ? null : 'gallery'); break
+        case '3': openPanel(activePanel === 'track' ? null : 'track'); break
+        case '4': openPanel(activePanel === 'settings' ? null : 'settings'); break
+        case '5': openPanel(activePanel === 'ai' ? null : 'ai'); break
         case '6': setShowMenu(m => !m); break
         case 'Escape': setActivePanel(null); setShowMenu(false); break
         case 'a': setShowArc(a => !a); break
@@ -147,13 +199,13 @@ export default function Playing({ state, dispatch, setField, actions, computed }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [])
+  }, [activePanel])
 
   // Streaming word count for gen feedback
   const streamingWords = state.streaming ? state.streaming.trim().split(/\s+/).length : 0
 
   return (
-    <div className="R">
+    <div className="R" ref={rootRef}>
       {/* Header */}
       <div className="hd">
         <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', overflow: 'hidden', flex: 1 }}>
@@ -165,17 +217,17 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           )}
         </div>
         <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
-          <button className={`b bs${activePanel === 'mem' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'mem' ? null : 'mem')}>
+          <button className={`b bs${activePanel === 'mem' ? ' ba' : ''}`} onClick={() => openPanel(activePanel === 'mem' ? null : 'mem')}>
             Memory{memCount > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{memCount}</span>}
           </button>
-          <button className={`b bs${activePanel === 'gallery' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'gallery' ? null : 'gallery')}>
+          <button className={`b bs${activePanel === 'gallery' ? ' ba' : ''}`} onClick={() => openPanel(activePanel === 'gallery' ? null : 'gallery')}>
             Gallery{gallery.count > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{gallery.count}</span>}
           </button>
-          <button className={`b bs${activePanel === 'track' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'track' ? null : 'track')}>
+          <button className={`b bs${activePanel === 'track' ? ' ba' : ''}`} onClick={() => openPanel(activePanel === 'track' ? null : 'track')}>
             Track{state.secs.length > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{state.secs.length}</span>}
           </button>
-          <button className={`b bs${activePanel === 'settings' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'settings' ? null : 'settings')}>Settings</button>
-          <button className={`b bs${activePanel === 'ai' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'ai' ? null : 'ai')}>AI</button>
+          <button className={`b bs${activePanel === 'settings' ? ' ba' : ''}`} onClick={() => openPanel(activePanel === 'settings' ? null : 'settings')}>Settings</button>
+          <button className={`b bs${activePanel === 'ai' ? ' ba' : ''}`} onClick={() => openPanel(activePanel === 'ai' ? null : 'ai')}>AI</button>
           <div style={{ position: 'relative' }}>
             <button className="b bs" onClick={() => setShowMenu(m => !m)}>&hellip;</button>
             <MenuPanel
@@ -203,7 +255,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       {/* Panels */}
       <AIPanel show={activePanel === 'ai'} onClose={() => setActivePanel(null)}
         storyModel={state.storyModel} supportModel={state.supportModel} setField={setField}
-        onSwitch={setActivePanel} />
+        onSwitch={openPanel} />
 
       <MemoryPanel
         show={activePanel === 'mem'} onClose={() => setActivePanel(null)}
@@ -225,7 +277,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onGenerateImage={(loreId) => openGenModal('lore', loreId)}
         story={state.story}
         overview={state.overview}
-        onSwitch={setActivePanel}
+        onSwitch={openPanel}
       />
 
       <GalleryPanel
@@ -234,7 +286,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onNewImage={() => openGenModal('story')}
         onDelete={gallery.removeImage}
         onClearAll={gallery.clearAll}
-        onSwitch={setActivePanel}
+        onSwitch={openPanel}
       />
 
       <TrackingPanel
@@ -242,7 +294,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         secs={state.secs} auFreq={state.auFreq} stUp={state.stUp}
         dispatch={dispatch} setField={setField}
         onUpdateStats={actions.doUpdateStats}
-        onSwitch={setActivePanel}
+        onSwitch={openPanel}
       />
 
       <SettingsPanel
@@ -250,7 +302,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         style={state.style} cStyle={state.cStyle}
         overview={state.overview} diff={state.diff}
         setField={setField}
-        onSwitch={setActivePanel}
+        onSwitch={openPanel}
         displayPrefs={dp.prefs}
         onSetTheme={dp.setTheme}
         onSetFontFamily={dp.setFontFamily}
@@ -279,6 +331,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         gen={state.gen}
         streaming={state.streaming}
         onChange={story => dispatch({ type: 'SET_STORY', story })}
+        pinScroll={pinScroll}
       />
 
       {/* Status bars */}
@@ -290,9 +343,16 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           {state.genStage === 'stats' && 'Updating stats...'}
           {state.genStage === 'summarizing' && 'Summarizing...'}
           {!state.genStage && (state.gen || state.stUp || state.summing) && 'Working...'}
-          {state.gen && (
-            <button className="b bs" onClick={actions.stop} style={{ marginLeft: 'auto', color: 'var(--dng)', padding: '.2rem .5rem' }}>&#x23f9;</button>
-          )}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: '.3rem' }}>
+            <button
+              className={`b bs sp${pinScroll ? ' ba' : ''}`}
+              onClick={() => setPinScroll(p => !p)}
+              title={pinScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
+            >{pinScroll ? '\u{1F4CC}' : '\u{1F4CC}'}</button>
+            {state.gen && (
+              <button className="b bs" onClick={actions.stop} style={{ color: 'var(--dng)', padding: '.2rem .5rem' }}>&#x23f9;</button>
+            )}
+          </span>
         </div>
       )}
       {state.story.trim() && !state.gen && !state.stUp && !state.summing && (
@@ -318,7 +378,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         arc={state.arc}
         onArcChange={v => setField('arc', v)}
         secsLength={state.secs.length}
-        onShowTracking={() => setActivePanel('track')}
+        onShowTracking={() => openPanel('track')}
       />
 
       {/* Toasts */}

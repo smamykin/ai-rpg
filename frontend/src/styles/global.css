@@ -95,6 +95,34 @@ select {
 .sta:focus { border: none; box-shadow: none; }
 .sta::placeholder { color: var(--mt); font-style: italic; }
 
+/* Story read view */
+.rd {
+  flex: 1;
+  font-family: var(--story-font, 'Crimson Pro'), Georgia, serif;
+  font-size: var(--story-size, 1.1rem);
+  line-height: 1.75;
+  background: var(--bg);
+  padding: 1rem;
+  color: var(--tx);
+  min-height: 0;
+  overflow-y: auto;
+}
+.rd p { margin-bottom: .85em; }
+.rd .pa {
+  border-left: 3px solid var(--ac2);
+  padding-left: .75rem;
+  margin-bottom: .85em;
+  color: var(--mt);
+  font-style: italic;
+}
+.rd .dq { color: var(--ac); }
+.rd strong { font-weight: 700; }
+.rd em { font-style: italic; }
+.rd-ph { color: var(--mt); font-style: italic; }
+
+/* Scroll pin */
+.sp { padding: .2rem .4rem !important; font-size: .7rem !important; }
+
 /* Header */
 .hd {
   display: flex;
