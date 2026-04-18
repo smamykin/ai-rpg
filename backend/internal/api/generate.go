@@ -235,3 +235,41 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"sections": updated})
 }
+
+type TransformRequest struct {
+	Text        string `json:"text"`
+	Instruction string `json:"instruction"`
+}
+
+// Transform applies an LLM-powered text transformation (fix, rewrite, etc.).
+func (h *Handlers) Transform(w http.ResponseWriter, r *http.Request) {
+	var req TransformRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Text == "" || req.Instruction == "" {
+		http.Error(w, "text and instruction are required", http.StatusBadRequest)
+		return
+	}
+
+	state, err := h.store.Load()
+	if err != nil {
+		state = &game.GameState{}
+	}
+	model := h.resolveSupportModel(state)
+
+	system := "You are a text editor for a narrative story. Return ONLY the corrected or transformed text. Do not add explanations, notes, or commentary. Preserve the original tone and style."
+	user := fmt.Sprintf("Instruction: %s\n\nText:\n%s", req.Instruction, req.Text)
+
+	result, err := h.client.Complete(r.Context(), model, system, user, 2000)
+	if err != nil {
+		log.Printf("Transform error: %v", err)
+		http.Error(w, "Transform failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	result = strings.TrimSpace(result)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"text": result})
+}

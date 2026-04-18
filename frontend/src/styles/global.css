@@ -123,6 +123,11 @@ select {
 /* Scroll pin */
 .sp { padding: .2rem .4rem !important; font-size: .7rem !important; }
 
+/* Selection toolbar */
+.stb { position: fixed; z-index: 35; display: flex; gap: .3rem; align-items: center; background: var(--sf); border: 1px solid var(--bd); border-radius: 8px; padding: .3rem .4rem; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+.stb-in { width: 140px; padding: .3rem .5rem !important; font-size: .78rem !important; border-radius: 6px !important; }
+.stb-ld { font-size: .78rem; color: var(--mt); display: flex; align-items: center; padding: .2rem .4rem; white-space: nowrap; }
+
 /* Header */
 .hd {
   display: flex;

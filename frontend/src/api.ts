@@ -121,6 +121,14 @@ export async function generateLore(
   return res.text
 }
 
+export async function transform(text: string, instruction: string): Promise<string> {
+  const res = await fetchJSON<{ text: string }>('/transform', {
+    method: 'POST',
+    body: JSON.stringify({ text, instruction }),
+  })
+  return res.text
+}
+
 export interface GenerateCallbacks {
   onChunk: (text: string) => void
   onDone: (text: string) => void
