@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    volumes:
+      - app-data:/data
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+      - DATA_DIR=/data
+      - STATIC_DIR=/static
+    restart: unless-stopped
+
+volumes:
+  app-data:
