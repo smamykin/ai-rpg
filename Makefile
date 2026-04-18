@@ -64,5 +64,4 @@ prod-logs:
 
 ## Deploy to VPS (usage: make deploy host=user@yourserver.com)
 deploy:
-	rsync -avz --exclude='node_modules' --exclude='.git' --exclude='backend/tmp' --exclude='backend/data' --exclude='frontend/dist' . $(host):~/ai-rpg-v2/
-	ssh $(host) 'cd ~/ai-rpg-v2 && docker compose -f docker-compose.prod.yml up -d --build'
+	ssh $(host) 'cd ~/ai-rpg-v2 && git pull && docker compose -f docker-compose.prod.yml up -d --build'
