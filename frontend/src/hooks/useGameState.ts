@@ -40,6 +40,7 @@ type Action =
   | { type: 'REMOVE_SEC'; id: string }
   | { type: 'SET_SECS'; secs: Section[] }
   | { type: 'LOAD_STATE'; state: GameState }
+  | { type: 'ENTER_HUB' }
   | { type: 'RESET' }
   | { type: 'SET_LOADED' }
   | { type: 'SET_GEN_STAGE'; stage: State['genStage'] }
@@ -104,6 +105,25 @@ function reducer(state: State, action: Action): State {
         phase: action.state.story ? 'playing' : 'setup',
         loaded: true,
         sumPreview: null,
+        gen: false,
+        streaming: '',
+        err: '',
+        genStage: null,
+      }
+    case 'ENTER_HUB':
+      return {
+        ...state,
+        ...defaultState(),
+        phase: 'hub',
+        loaded: true,
+        gen: false,
+        streaming: '',
+        err: '',
+        summing: false,
+        stUp: false,
+        sumPreview: null,
+        genStage: null,
+        saveStatus: 'idle',
       }
     case 'RESET':
       return {
@@ -153,24 +173,55 @@ export function useGameState() {
   const [pendingSummarize, setPendingSummarize] = useState(false)
   const pendingSumRange = useRef<[number, number]>([0, 0])
 
-  // Load state from server on mount
+  // Load state from server on mount. 404 → no current session → hub.
   useEffect(() => {
     api.getState()
-      .then(s => dispatch({ type: 'LOAD_STATE', state: s }))
-      .catch(() => dispatch({ type: 'SET_LOADED' }))
+      .then(s => {
+        api.setCurrentSessionId(s.sessionId)
+        dispatch({ type: 'LOAD_STATE', state: s })
+      })
+      .catch(err => {
+        if (err instanceof api.NoCurrentSessionError) {
+          api.setCurrentSessionId('')
+          dispatch({ type: 'ENTER_HUB' })
+        } else {
+          dispatch({ type: 'SET_LOADED' })
+        }
+      })
   }, [])
+
+  // Keep the api module's current session id in sync so X-Session-Id is attached to mutating requests.
+  useEffect(() => {
+    api.setCurrentSessionId(state.sessionId || '')
+  }, [state.sessionId])
+
+  // After LOAD_STATE / ENTER_HUB / SWITCH, skip the next auto-save tick to avoid echoing
+  // the freshly loaded state back to the server (which could also 409 if the session changed).
+  const skipNextSave = useRef(false)
+  const prevSessionRef = useRef(state.sessionId)
+  useEffect(() => {
+    if (prevSessionRef.current !== state.sessionId) {
+      skipNextSave.current = true
+      prevSessionRef.current = state.sessionId
+    }
+  }, [state.sessionId])
 
   // Auto-save to server (debounced)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const savedResetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => {
     if (!state.loaded) return
+    if (state.phase === 'hub' || !state.sessionId) return
     clearTimeout(saveTimer.current)
+    if (skipNextSave.current) {
+      skipNextSave.current = false
+      return
+    }
     saveTimer.current = setTimeout(() => {
       dispatch({ type: 'SET_SAVE_STATUS', status: 'saving' })
       clearTimeout(savedResetTimer.current)
-      const { story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
-      api.saveState({ story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq })
+      const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
+      api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq })
         .then(() => {
           dispatch({ type: 'SET_SAVE_STATUS', status: 'saved' })
           savedResetTimer.current = setTimeout(() => dispatch({ type: 'SET_SAVE_STATUS', status: 'idle' }), 2000)
@@ -180,7 +231,7 @@ export function useGameState() {
         })
     }, 1000)
     return () => clearTimeout(saveTimer.current)
-  }, [state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.loaded])
+  }, [state.name, state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.modelRoles, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.loaded, state.phase, state.sessionId])
 
   // Trigger stats update after generation if needed (ref to avoid forward reference)
   const doUpdateStatsRef = useRef<() => void>(() => {})
@@ -389,12 +440,26 @@ export function useGameState() {
     }
   }, [state.gen, pendingSummarize])
 
-  const newAdventure = useCallback(async () => {
+  // Cancel any debounced save and force a synchronous flush with the current state.
+  // Called before session switches so the old session's edits land before we point away.
+  const flushPendingSave = useCallback(async () => {
+    clearTimeout(saveTimer.current)
+    if (!state.sessionId || state.phase === 'hub') return
+    const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
     try {
-      await api.deleteState()
-    } catch { /* ignore */ }
+      await api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq })
+    } catch { /* ignore — 409 means user switched already, nothing to preserve */ }
+  }, [state])
+
+  const abortGeneration = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
+
+  // "New" now routes to the session hub instead of wiping the current save.
+  const enterHub = useCallback(() => {
     genCountRef.current = 0
-    dispatch({ type: 'RESET' })
+    api.setCurrentSessionId('')
+    dispatch({ type: 'ENTER_HUB' })
   }, [])
 
   const saveFile = useCallback(async () => {
@@ -424,6 +489,7 @@ export function useGameState() {
         if (!file) return
         const text = await file.text()
         const imported = await api.importState(text)
+        api.setCurrentSessionId(imported.sessionId)
         dispatch({ type: 'LOAD_STATE', state: imported })
       } catch {
         dispatch({ type: 'SET_ERR', err: 'Failed to load' })
@@ -455,11 +521,13 @@ export function useGameState() {
       confirmSummary,
       dismissSummary,
       doUpdateStats,
-      newAdventure,
+      enterHub,
       saveFile,
       exportMd,
       loadFile,
       generate,
+      flushPendingSave,
+      abortGeneration,
     },
     computed: {
       wordCount: wt,

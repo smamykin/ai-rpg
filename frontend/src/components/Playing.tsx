@@ -8,6 +8,7 @@ import SettingsPanel from './panels/SettingsPanel'
 import MenuPanel from './panels/MenuPanel'
 import GalleryPanel from './panels/GalleryPanel'
 import GenerateImageModal from './GenerateImageModal'
+import SaveAsScenarioModal from './SaveAsScenarioModal'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
 import type { GameState, GalleryImage } from '../types'
@@ -25,6 +26,9 @@ interface Props {
     arc: string
     storyModel: string
     supportModel: string
+    modelRoles: Record<string, string>
+    name: string
+    sessionId: string
     gen: boolean
     streaming: string
     err: string
@@ -53,7 +57,7 @@ interface Props {
     confirmSummary: (text: string) => void
     dismissSummary: () => void
     doUpdateStats: () => void
-    newAdventure: () => void
+    enterHub: () => void
     saveFile: () => void
     exportMd: () => void
     loadFile: () => void
@@ -69,7 +73,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [activePanel, setActivePanel] = useState<PanelId | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showArc, setShowArc] = useState(false)
-  const [cfm, setCfm] = useState(false)
+  const [showSaveAsScenario, setShowSaveAsScenario] = useState(false)
   const [pinScroll, setPinScroll] = useState(true)
 
   // Gallery
@@ -144,7 +148,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   }
 
   const handleImagesGenerated = (imgs: GalleryImage[]) => {
-    gallery.addImages(imgs)
+    gallery.addImages(imgs, state.sessionId)
   }
 
   // Toast: errors
@@ -236,25 +240,18 @@ export default function Playing({ state, dispatch, setField, actions, computed }
               onSave={actions.saveFile}
               onExportMd={actions.exportMd}
               onLoad={actions.loadFile}
-              onNew={() => setCfm(true)}
+              onHub={actions.enterHub}
+              onSaveAsScenario={() => setShowSaveAsScenario(true)}
+              canSaveAsScenario={!state.gen}
             />
           </div>
         </div>
       </div>
 
-      {/* Confirm reset */}
-      {cfm && (
-        <div className="cf">
-          <span style={{ fontSize: '.85rem', flex: 1 }}>Reset adventure?</span>
-          <button className="b bs" style={{ background: 'var(--dng)', borderColor: 'var(--dng)', color: '#fff' }}
-            onClick={() => { actions.newAdventure(); setCfm(false) }}>Yes</button>
-          <button className="b bs" onClick={() => setCfm(false)}>No</button>
-        </div>
-      )}
 
       {/* Panels */}
       <AIPanel show={activePanel === 'ai'} onClose={() => setActivePanel(null)}
-        storyModel={state.storyModel} supportModel={state.supportModel} setField={setField}
+        storyModel={state.storyModel} supportModel={state.supportModel} modelRoles={state.modelRoles} setField={setField}
         onSwitch={openPanel} />
 
       <MemoryPanel
@@ -283,6 +280,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       <GalleryPanel
         show={activePanel === 'gallery'} onClose={() => setActivePanel(null)}
         images={gallery.images}
+        currentSessionId={state.sessionId}
         onNewImage={() => openGenModal('story')}
         onDelete={gallery.removeImage}
         onClearAll={gallery.clearAll}
@@ -323,6 +321,20 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         }}
         defaultSource={genSource}
         defaultLoreEntryId={genLoreId}
+      />
+
+      <SaveAsScenarioModal
+        show={showSaveAsScenario}
+        onClose={() => setShowSaveAsScenario(false)}
+        state={{
+          name: state.name,
+          overview: state.overview,
+          cStyle: state.cStyle,
+          style: state.style,
+          diff: state.diff,
+          lore: state.lore,
+          secs: state.secs,
+        }}
       />
 
       {/* Story */}

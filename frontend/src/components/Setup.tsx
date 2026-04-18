@@ -2,30 +2,53 @@ import { useState } from 'react'
 import type { GameState } from '../types'
 import { STYLES } from '../types'
 import AIPanel from './panels/AIPanel'
+import SuggestNameButton from './SuggestNameButton'
 
 interface Props {
   state: {
+    name: string
     overview: string
     cStyle: string
     style: string
     diff: string
     storyModel: string
     supportModel: string
+    modelRoles: Record<string, string>
   }
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onStart: () => void
-  onLoad: () => void
+  onBack: () => void
 }
 
-export default function Setup({ state, setField, onStart, onLoad }: Props) {
+export default function Setup({ state, setField, onStart, onBack }: Props) {
   const [showAI, setShowAI] = useState(false)
 
   return (
     <div className="R">
       <div className="su">
         <div>
-          <div className="st">AI RPG</div>
-          <p className="ss" style={{ marginTop: '.5rem' }}>Open-world text adventure</p>
+          <div className="st">New Adventure</div>
+          <p className="ss" style={{ marginTop: '.5rem' }}>Set the scene, then begin.</p>
+        </div>
+
+        <div style={{ width: '100%' }}>
+          <label className="lb">Adventure name</label>
+          <div style={{ display: 'flex', gap: '.3rem', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={state.name}
+              onChange={e => setField('name', e.target.value)}
+              placeholder="Adventure"
+              style={{ flex: 1 }}
+            />
+            <SuggestNameButton
+              kind="session"
+              text={state.overview}
+              context={{ overview: state.overview }}
+              disabled={!state.overview.trim()}
+              onSuggest={n => setField('name', n)}
+            />
+          </div>
         </div>
 
         <div style={{ width: '100%' }}>
@@ -74,7 +97,7 @@ export default function Setup({ state, setField, onStart, onLoad }: Props) {
         </button>
 
         <div style={{ display: 'flex', gap: '.5rem' }}>
-          <button className="b bs" onClick={onLoad}>Load</button>
+          <button className="b bs" onClick={onBack}>&larr; Sessions</button>
           <button className="b bs" onClick={() => setShowAI(true)}>AI Model</button>
         </div>
       </div>
@@ -84,6 +107,7 @@ export default function Setup({ state, setField, onStart, onLoad }: Props) {
         onClose={() => setShowAI(false)}
         storyModel={state.storyModel}
         supportModel={state.supportModel}
+        modelRoles={state.modelRoles}
         setField={setField}
       />
     </div>

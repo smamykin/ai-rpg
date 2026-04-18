@@ -24,6 +24,12 @@ export interface Section {
 }
 
 export interface GameState {
+  sessionId: string
+  name: string
+  createdAt: number
+  lastPlayedAt: number
+  modelRoles: Record<string, string>
+
   story: string
   overview: string
   style: string
@@ -47,6 +53,48 @@ export interface GameState {
   addlMem?: string
 }
 
+export interface SessionMeta {
+  id: string
+  name: string
+  createdAt: number
+  lastPlayedAt: number
+  overviewHead?: string
+  storyChars: number
+}
+
+export interface Scenario {
+  id: string
+  name: string
+  description: string
+  overview: string
+  cStyle: string
+  style: string
+  diff: string
+  lore: LoreEntry[]
+  secs: Section[]
+  createdAt: number
+  updatedAt: number
+}
+
+export function defaultScenario(): Scenario {
+  return {
+    id: '',
+    name: '',
+    description: '',
+    overview: '',
+    cStyle: '',
+    style: '1 paragraph',
+    diff: 'normal',
+    lore: [],
+    secs: [],
+    createdAt: 0,
+    updatedAt: 0,
+  }
+}
+
+export const MODEL_ROLES = ['summary', 'imagePrompt', 'loreGen', 'scenarioPolish', 'naming'] as const
+export type ModelRole = typeof MODEL_ROLES[number]
+
 export interface ModelInfo {
   id: string
   name: string
@@ -69,6 +117,7 @@ export interface GalleryImage {
   createdAt: number
   source: 'story' | 'lore'
   loreEntryId?: string
+  sessionId?: string | null  // null = pre-v2 image with no session origin
 }
 
 export const DIMENSION_PRESETS = [
@@ -79,7 +128,7 @@ export const DIMENSION_PRESETS = [
   { label: '9:16', w: 832, h: 1216 },
 ] as const
 
-export type Phase = 'setup' | 'playing'
+export type Phase = 'hub' | 'setup' | 'playing' | 'scenarioEditor'
 export type Task = 'open' | 'action' | 'continue'
 
 export const STYLES = [
@@ -91,6 +140,11 @@ export const STYLES = [
 
 export function defaultState(): GameState {
   return {
+    sessionId: '',
+    name: 'Adventure',
+    createdAt: 0,
+    lastPlayedAt: 0,
+    modelRoles: {},
     story: '',
     overview: '',
     style: '1 paragraph',

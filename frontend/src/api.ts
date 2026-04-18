@@ -1,12 +1,30 @@
-import type { GameState, ModelInfo, ImageModelInfo, Section } from './types'
+import type { GameState, ModelInfo, ImageModelInfo, Section, SessionMeta, Scenario } from './types'
 
 const BASE = '/api'
 
+// Active session id — attached to mutating requests as X-Session-Id so the
+// server can reject saves that target a session the user has since switched away from.
+let currentSessionId = ''
+export function setCurrentSessionId(id: string) { currentSessionId = id }
+export function getCurrentSessionId() { return currentSessionId }
+
+export class SessionMismatchError extends Error {
+  constructor() { super('session mismatch'); this.name = 'SessionMismatchError' }
+}
+
+export class NoCurrentSessionError extends Error {
+  constructor() { super('no current session'); this.name = 'NoCurrentSessionError' }
+}
+
 async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(BASE + url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  })
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts?.headers as Record<string, string> | undefined) }
+  const method = (opts?.method || 'GET').toUpperCase()
+  if (method !== 'GET' && currentSessionId) {
+    headers['X-Session-Id'] = currentSessionId
+  }
+  const res = await fetch(BASE + url, { ...opts, headers })
+  if (res.status === 409) throw new SessionMismatchError()
+  if (res.status === 404 && url === '/state') throw new NoCurrentSessionError()
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
@@ -18,7 +36,7 @@ export async function getState(): Promise<GameState> {
   return fetchJSON<GameState>('/state')
 }
 
-export async function saveState(state: GameState): Promise<GameState> {
+export async function saveState(state: Partial<GameState>): Promise<GameState> {
   return fetchJSON<GameState>('/state', {
     method: 'PUT',
     body: JSON.stringify(state),
@@ -30,10 +48,9 @@ export async function deleteState(): Promise<void> {
 }
 
 export async function exportState(): Promise<Blob> {
-  const res = await fetch(BASE + '/state/export', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  })
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (currentSessionId) headers['X-Session-Id'] = currentSessionId
+  const res = await fetch(BASE + '/state/export', { method: 'POST', headers })
   return res.blob()
 }
 
@@ -43,6 +60,73 @@ export async function importState(data: string): Promise<GameState> {
     body: data,
   })
 }
+
+// --- Sessions ---
+
+export interface SessionsListResp {
+  sessions: SessionMeta[]
+  current?: string
+}
+
+export async function listSessions(): Promise<SessionsListResp> {
+  return fetchJSON<SessionsListResp>('/sessions')
+}
+
+export async function createSession(name: string, scenarioId?: string): Promise<GameState> {
+  return fetchJSON<GameState>('/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ name, scenarioId }),
+  })
+}
+
+export async function renameSession(id: string, name: string): Promise<void> {
+  await fetchJSON(`/sessions/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await fetchJSON(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function switchSession(id: string): Promise<GameState> {
+  return fetchJSON<GameState>('/sessions/current', {
+    method: 'PUT',
+    body: JSON.stringify({ id }),
+  })
+}
+
+// --- Scenarios ---
+
+export async function listScenarios(): Promise<Scenario[]> {
+  const res = await fetchJSON<{ scenarios: Scenario[] }>('/scenarios')
+  return res.scenarios || []
+}
+
+export async function getScenario(id: string): Promise<Scenario> {
+  return fetchJSON<Scenario>(`/scenarios/${encodeURIComponent(id)}`)
+}
+
+export async function createScenario(sc: Partial<Scenario>): Promise<Scenario> {
+  return fetchJSON<Scenario>('/scenarios', {
+    method: 'POST',
+    body: JSON.stringify(sc),
+  })
+}
+
+export async function updateScenario(id: string, sc: Partial<Scenario>): Promise<Scenario> {
+  return fetchJSON<Scenario>(`/scenarios/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(sc),
+  })
+}
+
+export async function deleteScenario(id: string): Promise<void> {
+  await fetchJSON(`/scenarios/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// --- Models + AI ---
 
 export async function getModels(): Promise<ModelInfo[]> {
   const res = await fetchJSON<{ models: ModelInfo[] }>('/models')
@@ -121,6 +205,25 @@ export async function generateLore(
   return res.text
 }
 
+export interface SuggestNameCtx {
+  overview?: string
+  recentStory?: string
+  loreEntries?: { name: string; text: string }[]
+}
+
+export async function suggestName(
+  kind: 'lore' | 'session' | 'scenario',
+  text: string,
+  tag?: string,
+  context?: SuggestNameCtx
+): Promise<string> {
+  const res = await fetchJSON<{ name: string }>('/suggest-name', {
+    method: 'POST',
+    body: JSON.stringify({ kind, text, tag: tag || '', context: context || {} }),
+  })
+  return res.name
+}
+
 export async function transform(text: string, instruction: string): Promise<string> {
   const res = await fetchJSON<{ text: string }>('/transform', {
     method: 'POST',
@@ -141,9 +244,11 @@ export function generate(
   signal: AbortSignal,
   callbacks: GenerateCallbacks
 ): void {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (currentSessionId) headers['X-Session-Id'] = currentSessionId
   fetch(BASE + '/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ task, action }),
     signal,
   })

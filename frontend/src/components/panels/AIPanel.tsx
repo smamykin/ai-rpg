@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from 'react'
 import ModelPicker from '../ModelPicker'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
-import type { ModelInfo, GameState } from '../../types'
+import type { ModelInfo, GameState, ModelRole } from '../../types'
+import { MODEL_ROLES } from '../../types'
 import * as apiClient from '../../api'
 
 interface Props {
@@ -10,11 +11,20 @@ interface Props {
   onClose: () => void
   storyModel: string
   supportModel: string
+  modelRoles?: Record<string, string>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onSwitch?: (panel: PanelId) => void
 }
 
-export default function AIPanel({ show, onClose, storyModel, supportModel, setField, onSwitch }: Props) {
+const ROLE_LABELS: Record<ModelRole, { name: string; hint: string }> = {
+  summary:        { name: 'Summaries',      hint: 'Compressing old story into memory. Cheap + long-context works well.' },
+  imagePrompt:    { name: 'Image prompts',  hint: 'Turning instructions into vivid image prompts.' },
+  loreGen:        { name: 'Lore',           hint: 'Generating lore entries from story context.' },
+  scenarioPolish: { name: 'Scenario polish', hint: 'Refining scenario overviews and lore during authoring.' },
+  naming:         { name: 'Naming',         hint: 'Tiny calls: suggested names for sessions, lore entries, scenarios.' },
+}
+
+export default function AIPanel({ show, onClose, storyModel, supportModel, modelRoles, setField, onSwitch }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelsErr, setModelsErr] = useState('')
@@ -89,8 +99,36 @@ export default function AIPanel({ show, onClose, storyModel, supportModel, setFi
               <button className="b bs" onClick={() => setField('supportModel', storyModel)} title="Use same as story model">=</button>
             )}
           </div>
-          <div className="hint">Used for summaries and stat tracking. If empty, uses the story model.</div>
+          <div className="hint">Default fallback for all non-story tasks. Individual tasks below can override.</div>
         </div>
+
+        <details className="adv">
+          <summary>Advanced &mdash; per-task models</summary>
+          <div className="hint" style={{ marginBottom: '.5rem' }}>
+            Override specific tasks. Empty = inherit Support.
+          </div>
+          {MODEL_ROLES.map(role => {
+            const current = modelRoles?.[role] ?? ''
+            return (
+              <div key={role} className="gr">
+                <label className="lb">{ROLE_LABELS[role].name}</label>
+                <ModelPicker
+                  id={`role-${role}`}
+                  value={current}
+                  onChange={v => {
+                    const next = { ...(modelRoles || {}) }
+                    if (v) next[role] = v
+                    else delete next[role]
+                    setField('modelRoles', next)
+                  }}
+                  models={models}
+                  placeholder="(inherit Support)"
+                />
+                <div className="hint">{ROLE_LABELS[role].hint}</div>
+              </div>
+            )
+          })}
+        </details>
       </div>
     </>
   )

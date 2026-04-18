@@ -39,15 +39,32 @@ func (h *Handlers) resolveSupportModel(state *game.GameState) string {
 	return h.cfg.StoryModel
 }
 
+// resolveModel picks the model for a task role, falling back through overrides → support → story.
+// Known roles: summary, imagePrompt, loreGen, scenarioPolish, naming.
+// Empty role or unknown role returns the support model.
+func (h *Handlers) resolveModel(role string, state *game.GameState) string {
+	if role != "" && state != nil && state.ModelRoles != nil {
+		if v, ok := state.ModelRoles[role]; ok && v != "" {
+			return v
+		}
+	}
+	return h.resolveSupportModel(state)
+}
+
 // Generate handles story generation with SSE streaming.
 func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
+	curID := h.validateSession(w, r)
+	if curID == "" {
+		return
+	}
+
 	var req GenerateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	state, err := h.store.Load()
+	state, err := h.sessions.Get(curID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -107,9 +124,11 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 		state.Story = strings.TrimSpace(state.Story) + "\n\n" + strings.TrimSpace(cleaned)
 	}
 
-	// Save updated state
-	if err := h.store.Save(state); err != nil {
-		log.Printf("Failed to save state after generation: %v", err)
+	// Only save if the current session still matches (user may have switched mid-generation).
+	if cur, _ := h.sessions.GetCurrent(); cur == curID {
+		if err := h.sessions.Save(curID, state); err != nil {
+			log.Printf("Failed to save state after generation: %v", err)
+		}
 	}
 
 	// Send final done event
@@ -120,6 +139,11 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 
 // Summarize compresses old story text into a memory entry.
 func (h *Handlers) Summarize(w http.ResponseWriter, r *http.Request) {
+	curID := h.validateSession(w, r)
+	if curID == "" {
+		return
+	}
+
 	var req SummarizeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
@@ -131,12 +155,12 @@ func (h *Handlers) Summarize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := h.store.Load()
+	state, err := h.sessions.Get(curID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	model := h.resolveSupportModel(state)
+	model := h.resolveModel("summary", state)
 
 	systemPrompt := "You are a precise story summarizer."
 	userPrompt := "Summarize (1/3 length). Preserve key facts. Past tense. ONLY the summary.\n\n" + req.Text
@@ -163,6 +187,11 @@ func (h *Handlers) Summarize(w http.ResponseWriter, r *http.Request) {
 
 // UpdateStats asks the AI to update game state tracking sections.
 func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
+	curID := h.validateSession(w, r)
+	if curID == "" {
+		return
+	}
+
 	var req UpdateStatsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
@@ -174,7 +203,7 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := h.store.Load()
+	state, err := h.sessions.Get(curID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -253,7 +282,7 @@ func (h *Handlers) Transform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := h.store.Load()
+	state, err := h.sessions.LoadCurrent()
 	if err != nil {
 		state = &game.GameState{}
 	}
