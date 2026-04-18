@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import ModelPicker from '../ModelPicker'
+import PanelTabs from '../PanelTabs'
+import type { PanelId } from '../PanelTabs'
 import type { ModelInfo, GameState } from '../../types'
 import * as apiClient from '../../api'
 
@@ -9,9 +11,10 @@ interface Props {
   storyModel: string
   supportModel: string
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
+  onSwitch?: (panel: PanelId) => void
 }
 
-export default function AIPanel({ show, onClose, storyModel, supportModel, setField }: Props) {
+export default function AIPanel({ show, onClose, storyModel, supportModel, setField, onSwitch }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelsErr, setModelsErr] = useState('')
@@ -43,6 +46,7 @@ export default function AIPanel({ show, onClose, storyModel, supportModel, setFi
           <span>AI Model</span>
           <button className="b bs" onClick={onClose}>&#x2715;</button>
         </div>
+        {onSwitch && <PanelTabs active="ai" onSwitch={onSwitch} />}
 
         <div className="gr">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.3rem' }}>

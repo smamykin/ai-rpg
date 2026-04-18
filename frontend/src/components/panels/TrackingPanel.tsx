@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Section, GameState } from '../../types'
 import { uid } from '../../types'
+import PanelTabs from '../PanelTabs'
+import type { PanelId } from '../PanelTabs'
 
 interface Props {
   show: boolean
@@ -11,11 +13,12 @@ interface Props {
   dispatch: React.Dispatch<any>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onUpdateStats: () => void
+  onSwitch?: (panel: PanelId) => void
 }
 
 export default function TrackingPanel({
   show, onClose, secs, auFreq, stUp,
-  dispatch, setField, onUpdateStats,
+  dispatch, setField, onUpdateStats, onSwitch,
 }: Props) {
   const [nName, setNName] = useState('')
   const [nDesc, setNDesc] = useState('')
@@ -28,6 +31,7 @@ export default function TrackingPanel({
           <span>Tracking</span>
           <button className="b bs" onClick={onClose}>&#x2715;</button>
         </div>
+        {onSwitch && <PanelTabs active="track" onSwitch={onSwitch} />}
 
         {secs.length < 5 && (
           <div className="ax">

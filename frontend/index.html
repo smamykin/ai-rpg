@@ -7,6 +7,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <script>
+      try {
+        var p = JSON.parse(localStorage.getItem('ai-rpg-display') || '{}');
+        var themes = {
+          gold: {'--bg':'#0c0a09','--sf':'#161210','--sf2':'#1e1a16','--bd':'#2e2922','--tx':'#e8e0d4','--mt':'#8a8078','--ac':'#d4a843','--ac2':'#a37e2c','--dng':'#c0392b'},
+          midnight: {'--bg':'#090c14','--sf':'#0f1420','--sf2':'#151c2c','--bd':'#1e2a40','--tx':'#d4dce8','--mt':'#6a7a90','--ac':'#4a9eed','--ac2':'#2d6fb5','--dng':'#e04848'},
+          forest: {'--bg':'#080c0a','--sf':'#0e1612','--sf2':'#141e18','--bd':'#1e3028','--tx':'#d4e8dc','--mt':'#6a8a78','--ac':'#4ec07a','--ac2':'#2d8a54','--dng':'#d94444'},
+          ember: {'--bg':'#0e0908','--sf':'#181010','--sf2':'#221616','--bd':'#3a2220','--tx':'#e8d8d4','--mt':'#907068','--ac':'#e06040','--ac2':'#b04430','--dng':'#e04848'}
+        };
+        var t = themes[p.theme];
+        if (t) Object.keys(t).forEach(function(k) { document.documentElement.style.setProperty(k, t[k]); });
+        if (p.fontFamily) document.documentElement.style.setProperty('--story-font', "'" + p.fontFamily + "'");
+        if (p.fontSize) document.documentElement.style.setProperty('--story-size', p.fontSize + 'rem');
+      } catch(e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

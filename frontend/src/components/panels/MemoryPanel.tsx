@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import type { Summary, LoreEntry, GameState, GalleryImage } from '../../types'
 import { uid, LORE_TAGS } from '../../types'
 import Lightbox from '../Lightbox'
+import PanelTabs from '../PanelTabs'
+import type { PanelId } from '../PanelTabs'
 import * as api from '../../api'
 
 type Tab = 'summaries' | 'lore'
@@ -36,6 +38,7 @@ interface Props {
   onGenerateImage?: (loreId: string) => void
   story?: string
   overview?: string
+  onSwitch?: (panel: PanelId) => void
 }
 
 export default function MemoryPanel({
@@ -44,6 +47,7 @@ export default function MemoryPanel({
   dispatch, setField, onSummarize, onConfirmSummary, onDismissSummary,
   galleryImages = [], onGenerateImage,
   story = '', overview = '',
+  onSwitch,
 }: Props) {
   const [tab, setTab] = useState<Tab>('summaries')
   const [editPreview, setEditPreview] = useState('')
@@ -100,6 +104,7 @@ export default function MemoryPanel({
           <span>Memory</span>
           <button className="b bs" onClick={onClose}>&#x2715;</button>
         </div>
+        {onSwitch && <PanelTabs active="mem" onSwitch={onSwitch} />}
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '.3rem', marginBottom: '.6rem' }}>

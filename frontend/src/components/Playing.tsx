@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import StoryArea from './StoryArea'
 import ActionInput from './ActionInput'
 import AIPanel from './panels/AIPanel'
@@ -8,8 +8,12 @@ import SettingsPanel from './panels/SettingsPanel'
 import MenuPanel from './panels/MenuPanel'
 import GalleryPanel from './panels/GalleryPanel'
 import GenerateImageModal from './GenerateImageModal'
+import ToastContainer from './Toast'
+import type { PanelId } from './PanelTabs'
 import type { GameState, GalleryImage } from '../types'
 import { useGallery } from '../hooks/useGallery'
+import { useToast } from '../hooks/useToast'
+import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
 
 interface Props {
   state: {
@@ -34,6 +38,8 @@ interface Props {
     summing: boolean
     sumPreview: string | null
     stUp: boolean
+    genStage: 'thinking' | 'writing' | 'stats' | 'summarizing' | null
+    saveStatus: 'idle' | 'saving' | 'saved'
   }
   dispatch: React.Dispatch<any>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
@@ -60,20 +66,22 @@ interface Props {
 }
 
 export default function Playing({ state, dispatch, setField, actions, computed }: Props) {
-  const [showMem, setShowMem] = useState(false)
-  const [showSt, setShowSt] = useState(false)
-  const [showSet, setShowSet] = useState(false)
-  const [showAI, setShowAI] = useState(false)
+  const [activePanel, setActivePanel] = useState<PanelId | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showArc, setShowArc] = useState(false)
   const [cfm, setCfm] = useState(false)
 
   // Gallery
-  const [showGallery, setShowGallery] = useState(false)
   const [showGenModal, setShowGenModal] = useState(false)
   const [genSource, setGenSource] = useState<'story' | 'lore'>('story')
   const [genLoreId, setGenLoreId] = useState<string | undefined>()
   const gallery = useGallery()
+
+  // Toasts
+  const { toasts, addToast, removeToast } = useToast()
+
+  // Display preferences
+  const dp = useDisplayPrefs()
 
   const memCount = state.summaries.length + state.lore.length
 
@@ -87,23 +95,87 @@ export default function Playing({ state, dispatch, setField, actions, computed }
     gallery.addImages(imgs)
   }
 
+  // Toast: errors
+  const prevErr = useRef('')
+  useEffect(() => {
+    if (state.err && state.err !== prevErr.current) {
+      addToast(state.err, 'error', 5000)
+    }
+    prevErr.current = state.err
+  }, [state.err, addToast])
+
+  // Toast: stats updated
+  const prevStUp = useRef(false)
+  useEffect(() => {
+    if (prevStUp.current && !state.stUp) {
+      addToast('Stats updated', 'info')
+    }
+    prevStUp.current = state.stUp
+  }, [state.stUp, addToast])
+
+  // Toast: summarization
+  const prevSumming = useRef(false)
+  useEffect(() => {
+    if (!prevSumming.current && state.summing) {
+      addToast('Summarizing...', 'info')
+    }
+    prevSumming.current = state.summing
+  }, [state.summing, addToast])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+
+      switch (e.key) {
+        case '1': setActivePanel(p => p === 'mem' ? null : 'mem'); break
+        case '2': setActivePanel(p => p === 'gallery' ? null : 'gallery'); break
+        case '3': setActivePanel(p => p === 'track' ? null : 'track'); break
+        case '4': setActivePanel(p => p === 'settings' ? null : 'settings'); break
+        case '5': setActivePanel(p => p === 'ai' ? null : 'ai'); break
+        case '6': setShowMenu(m => !m); break
+        case 'Escape': setActivePanel(null); setShowMenu(false); break
+        case 'a': setShowArc(a => !a); break
+        case '/': {
+          e.preventDefault()
+          const textarea = document.querySelector('.ai') as HTMLTextAreaElement
+          textarea?.focus()
+          break
+        }
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  // Streaming word count for gen feedback
+  const streamingWords = state.streaming ? state.streaming.trim().split(/\s+/).length : 0
+
   return (
     <div className="R">
       {/* Header */}
       <div className="hd">
-        <h1>{state.overview?.slice(0, 24) || 'AI RPG'}{state.overview && state.overview.length > 24 ? '\u2026' : ''}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', overflow: 'hidden', flex: 1 }}>
+          <h1>{state.overview?.slice(0, 24) || 'AI RPG'}{state.overview && state.overview.length > 24 ? '\u2026' : ''}</h1>
+          {state.saveStatus !== 'idle' && (
+            <span className="sv">
+              {state.saveStatus === 'saving' ? 'Saving...' : '\u2713 Saved'}
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
-          <button className="b bs" onClick={() => setShowMem(s => !s)}>
+          <button className={`b bs${activePanel === 'mem' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'mem' ? null : 'mem')}>
             Memory{memCount > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{memCount}</span>}
           </button>
-          <button className="b bs" onClick={() => setShowGallery(s => !s)}>
+          <button className={`b bs${activePanel === 'gallery' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'gallery' ? null : 'gallery')}>
             Gallery{gallery.count > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{gallery.count}</span>}
           </button>
-          <button className="b bs" onClick={() => setShowSt(s => !s)}>
+          <button className={`b bs${activePanel === 'track' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'track' ? null : 'track')}>
             Track{state.secs.length > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{state.secs.length}</span>}
           </button>
-          <button className="b bs" onClick={() => setShowSet(s => !s)}>Settings</button>
-          <button className="b bs" onClick={() => setShowAI(s => !s)}>AI</button>
+          <button className={`b bs${activePanel === 'settings' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'settings' ? null : 'settings')}>Settings</button>
+          <button className={`b bs${activePanel === 'ai' ? ' ba' : ''}`} onClick={() => setActivePanel(p => p === 'ai' ? null : 'ai')}>AI</button>
           <div style={{ position: 'relative' }}>
             <button className="b bs" onClick={() => setShowMenu(m => !m)}>&hellip;</button>
             <MenuPanel
@@ -129,11 +201,12 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       )}
 
       {/* Panels */}
-      <AIPanel show={showAI} onClose={() => setShowAI(false)}
-        storyModel={state.storyModel} supportModel={state.supportModel} setField={setField} />
+      <AIPanel show={activePanel === 'ai'} onClose={() => setActivePanel(null)}
+        storyModel={state.storyModel} supportModel={state.supportModel} setField={setField}
+        onSwitch={setActivePanel} />
 
       <MemoryPanel
-        show={showMem} onClose={() => setShowMem(false)}
+        show={activePanel === 'mem'} onClose={() => setActivePanel(null)}
         summaries={state.summaries}
         lore={state.lore}
         autoSum={state.autoSum}
@@ -152,28 +225,36 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onGenerateImage={(loreId) => openGenModal('lore', loreId)}
         story={state.story}
         overview={state.overview}
+        onSwitch={setActivePanel}
       />
 
       <GalleryPanel
-        show={showGallery} onClose={() => setShowGallery(false)}
+        show={activePanel === 'gallery'} onClose={() => setActivePanel(null)}
         images={gallery.images}
         onNewImage={() => openGenModal('story')}
         onDelete={gallery.removeImage}
         onClearAll={gallery.clearAll}
+        onSwitch={setActivePanel}
       />
 
       <TrackingPanel
-        show={showSt} onClose={() => setShowSt(false)}
+        show={activePanel === 'track'} onClose={() => setActivePanel(null)}
         secs={state.secs} auFreq={state.auFreq} stUp={state.stUp}
         dispatch={dispatch} setField={setField}
         onUpdateStats={actions.doUpdateStats}
+        onSwitch={setActivePanel}
       />
 
       <SettingsPanel
-        show={showSet} onClose={() => setShowSet(false)}
+        show={activePanel === 'settings'} onClose={() => setActivePanel(null)}
         style={state.style} cStyle={state.cStyle}
         overview={state.overview} diff={state.diff}
         setField={setField}
+        onSwitch={setActivePanel}
+        displayPrefs={dp.prefs}
+        onSetTheme={dp.setTheme}
+        onSetFontFamily={dp.setFontFamily}
+        onSetFontSize={dp.setFontSize}
       />
 
       {/* Generate Image Modal */}
@@ -201,17 +282,20 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       />
 
       {/* Status bars */}
-      {state.gen && (
+      {(state.gen || state.stUp || state.summing) && (
         <div className="gb">
           <span className="gd">&#x25cf;</span>
-          {state.stUp ? 'Updating stats...' : 'Generating...'}
-          <button className="b bs" onClick={actions.stop} style={{ marginLeft: 'auto', color: 'var(--dng)', padding: '.2rem .5rem' }}>&#x23f9;</button>
+          {state.genStage === 'thinking' && 'Thinking...'}
+          {state.genStage === 'writing' && <>Writing...{streamingWords > 0 && ` +${streamingWords} words`}</>}
+          {state.genStage === 'stats' && 'Updating stats...'}
+          {state.genStage === 'summarizing' && 'Summarizing...'}
+          {!state.genStage && (state.gen || state.stUp || state.summing) && 'Working...'}
+          {state.gen && (
+            <button className="b bs" onClick={actions.stop} style={{ marginLeft: 'auto', color: 'var(--dng)', padding: '.2rem .5rem' }}>&#x23f9;</button>
+          )}
         </div>
       )}
-      {!state.gen && state.stUp && (
-        <div className="gb"><span className="gd">&#x25cf;</span> Auto-updating stats...</div>
-      )}
-      {state.story.trim() && !state.gen && !state.stUp && (
+      {state.story.trim() && !state.gen && !state.stUp && !state.summing && (
         <div className="ib">
           <span>{computed.wordCount.toLocaleString()}w</span>
           {state.summaries.length > 0 && <span className="bd" style={{ background: 'var(--ac2)', color: '#fff' }}>Sum {state.summaries.length}</span>}
@@ -219,9 +303,6 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           {state.secs.length > 0 && state.auFreq > 0 && <span className="bd" style={{ background: 'var(--bd)', color: 'var(--tx)' }}>auto:{state.auFreq}</span>}
         </div>
       )}
-
-      {/* Error */}
-      {state.err && <div className="er">{state.err}</div>}
 
       {/* Action input */}
       <ActionInput
@@ -237,8 +318,11 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         arc={state.arc}
         onArcChange={v => setField('arc', v)}
         secsLength={state.secs.length}
-        onShowTracking={() => setShowSt(true)}
+        onShowTracking={() => setActivePanel('track')}
       />
+
+      {/* Toasts */}
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
   )
 }

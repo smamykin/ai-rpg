@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { GalleryImage } from '../../types'
 import Lightbox from '../Lightbox'
+import PanelTabs from '../PanelTabs'
+import type { PanelId } from '../PanelTabs'
 
 interface Props {
   show: boolean
@@ -9,11 +11,12 @@ interface Props {
   onNewImage: () => void
   onDelete: (id: string) => void
   onClearAll: () => void
+  onSwitch?: (panel: PanelId) => void
 }
 
 type Filter = 'all' | 'story' | 'lore'
 
-export default function GalleryPanel({ show, onClose, images, onNewImage, onDelete, onClearAll }: Props) {
+export default function GalleryPanel({ show, onClose, images, onNewImage, onDelete, onClearAll, onSwitch }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const [lbIdx, setLbIdx] = useState<number | null>(null)
   const [cfmClear, setCfmClear] = useState(false)
@@ -36,6 +39,7 @@ export default function GalleryPanel({ show, onClose, images, onNewImage, onDele
           <span>Gallery</span>
           <button className="b bs" onClick={onClose}>&#x2715;</button>
         </div>
+        {onSwitch && <PanelTabs active="gallery" onSwitch={onSwitch} />}
 
         <button className="b ba" style={{ width: '100%', marginBottom: '.6rem' }} onClick={onNewImage}>
           + New Image

@@ -12,6 +12,8 @@ interface State extends GameState {
   stUp: boolean
   loaded: boolean
   sumPreview: string | null
+  genStage: 'thinking' | 'writing' | 'stats' | 'summarizing' | null
+  saveStatus: 'idle' | 'saving' | 'saved'
 }
 
 type Action =
@@ -40,6 +42,8 @@ type Action =
   | { type: 'LOAD_STATE'; state: GameState }
   | { type: 'RESET' }
   | { type: 'SET_LOADED' }
+  | { type: 'SET_GEN_STAGE'; stage: State['genStage'] }
+  | { type: 'SET_SAVE_STATUS'; status: State['saveStatus'] }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -112,9 +116,15 @@ function reducer(state: State, action: Action): State {
         stUp: false,
         loaded: true,
         sumPreview: null,
+        genStage: null,
+        saveStatus: 'idle',
       }
     case 'SET_LOADED':
       return { ...state, loaded: true }
+    case 'SET_GEN_STAGE':
+      return { ...state, genStage: action.stage }
+    case 'SET_SAVE_STATUS':
+      return { ...state, saveStatus: action.status }
     default:
       return state
   }
@@ -130,6 +140,8 @@ const initialState: State = {
   stUp: false,
   loaded: false,
   sumPreview: null,
+  genStage: null,
+  saveStatus: 'idle',
 }
 
 export function useGameState() {
@@ -150,12 +162,22 @@ export function useGameState() {
 
   // Auto-save to server (debounced)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const savedResetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => {
     if (!state.loaded) return
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
+      dispatch({ type: 'SET_SAVE_STATUS', status: 'saving' })
+      clearTimeout(savedResetTimer.current)
       const { story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
-      api.saveState({ story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq }).catch(() => {})
+      api.saveState({ story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq })
+        .then(() => {
+          dispatch({ type: 'SET_SAVE_STATUS', status: 'saved' })
+          savedResetTimer.current = setTimeout(() => dispatch({ type: 'SET_SAVE_STATUS', status: 'idle' }), 2000)
+        })
+        .catch(() => {
+          dispatch({ type: 'SET_SAVE_STATUS', status: 'idle' })
+        })
     }, 1000)
     return () => clearTimeout(saveTimer.current)
   }, [state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.loaded])
@@ -170,6 +192,7 @@ export function useGameState() {
 
   const generate = useCallback((task: string, action?: string, baseStory?: string) => {
     dispatch({ type: 'SET_GEN', gen: true })
+    dispatch({ type: 'SET_GEN_STAGE', stage: 'thinking' })
     dispatch({ type: 'SET_ERR', err: '' })
     dispatch({ type: 'SET_STREAMING', text: '' })
 
@@ -194,6 +217,7 @@ export function useGameState() {
     savePromise.then(() => {
       api.generate(task, action || '', ctrl.signal, {
         onChunk: (text) => {
+          dispatch({ type: 'SET_GEN_STAGE', stage: 'writing' })
           dispatch({ type: 'SET_STREAMING', text })
           dispatch({ type: 'SET_STORY', story: currentStory.trim() + '\n\n' + text })
         },
@@ -202,6 +226,7 @@ export function useGameState() {
           dispatch({ type: 'SET_STORY', story: finalStory })
           dispatch({ type: 'SET_STREAMING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
+          dispatch({ type: 'SET_GEN_STAGE', stage: null })
 
           if (text.trim() && state.auFreq > 0 && state.secs.length > 0) {
             genCountRef.current++
@@ -223,6 +248,7 @@ export function useGameState() {
           dispatch({ type: 'SET_ERR', err: error.slice(0, 300) })
           dispatch({ type: 'SET_STREAMING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
+          dispatch({ type: 'SET_GEN_STAGE', stage: null })
         },
       })
     })
@@ -274,6 +300,7 @@ export function useGameState() {
     setTimeout(() => {
       dispatch({ type: 'SET_STREAMING', text: '' })
       dispatch({ type: 'SET_GEN', gen: false })
+      dispatch({ type: 'SET_GEN_STAGE', stage: null })
       dispatch({ type: 'SET_ERR', err: 'Stopped' })
     }, 500)
   }, [])
@@ -288,6 +315,7 @@ export function useGameState() {
     const to = state.story.length - KR
     const textToSum = state.story.slice(from, to)
     dispatch({ type: 'SET_SUMMING', summing: true })
+    dispatch({ type: 'SET_GEN_STAGE', stage: 'summarizing' })
     dispatch({ type: 'SET_ERR', err: '' })
 
     try {
@@ -310,6 +338,7 @@ export function useGameState() {
     } catch (e) {
       dispatch({ type: 'SET_ERR', err: 'Summarization failed: ' + (e instanceof Error ? e.message : '') })
     }
+    dispatch({ type: 'SET_GEN_STAGE', stage: null })
     dispatch({ type: 'SET_SUMMING', summing: false })
   }, [state.story, state.sumUpTo, state.summing, state.autoAccept, state.sumThreshold])
 
@@ -330,6 +359,7 @@ export function useGameState() {
   const doUpdateStats = useCallback(async () => {
     if (!state.secs.length || state.stUp) return
     dispatch({ type: 'SET_STUP', stUp: true })
+    dispatch({ type: 'SET_GEN_STAGE', stage: 'stats' })
     dispatch({ type: 'SET_ERR', err: '' })
 
     try {
@@ -338,6 +368,7 @@ export function useGameState() {
     } catch (e) {
       dispatch({ type: 'SET_ERR', err: 'Stats update failed: ' + (e instanceof Error ? e.message : '') })
     }
+    dispatch({ type: 'SET_GEN_STAGE', stage: null })
     dispatch({ type: 'SET_STUP', stUp: false })
   }, [state.secs, state.story, state.stUp])
 
