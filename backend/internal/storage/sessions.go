@@ -254,6 +254,22 @@ func (s *SessionStore) ClearCurrent() error {
 	return nil
 }
 
+// DeleteAll removes every session file and clears the current pointer.
+func (s *SessionStore) DeleteAll() error {
+	entries, err := os.ReadDir(s.sessionsPath())
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read sessions dir: %w", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		_ = os.Remove(filepath.Join(s.sessionsPath(), e.Name()))
+	}
+	_ = os.Remove(s.currentPath())
+	return nil
+}
+
 // LoadCurrent loads the state for the current session, or ErrNoCurrent.
 func (s *SessionStore) LoadCurrent() (*game.GameState, error) {
 	id, err := s.GetCurrent()

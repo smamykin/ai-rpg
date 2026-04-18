@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, Summary, LoreEntry, Section, Phase } from '../types'
+import type { GameState, Summary, LoreEntry, Section, Phase, TTSModelSettings } from '../types'
 import { defaultState, uid, wordCount } from '../types'
 import * as api from '../api'
 
@@ -14,6 +14,8 @@ interface State extends GameState {
   sumPreview: string | null
   genStage: 'thinking' | 'writing' | 'stats' | 'summarizing' | null
   saveStatus: 'idle' | 'saving' | 'saved'
+  lastNarrationId: number
+  lastNarrationText: string
 }
 
 type Action =
@@ -45,6 +47,10 @@ type Action =
   | { type: 'SET_LOADED' }
   | { type: 'SET_GEN_STAGE'; stage: State['genStage'] }
   | { type: 'SET_SAVE_STATUS'; status: State['saveStatus'] }
+  | { type: 'SET_LAST_NARRATION'; text: string }
+  | { type: 'SET_TTS_AUTOPLAY'; autoPlay: boolean }
+  | { type: 'SET_TTS_MODEL'; model: string }
+  | { type: 'SET_TTS_MODEL_SETTING'; model: string; settings: Partial<TTSModelSettings> }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -102,6 +108,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         ...action.state,
+        tts: action.state.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
         phase: action.state.story ? 'playing' : 'setup',
         loaded: true,
         sumPreview: null,
@@ -124,6 +131,8 @@ function reducer(state: State, action: Action): State {
         sumPreview: null,
         genStage: null,
         saveStatus: 'idle',
+        lastNarrationId: 0,
+        lastNarrationText: '',
       }
     case 'RESET':
       return {
@@ -138,6 +147,8 @@ function reducer(state: State, action: Action): State {
         sumPreview: null,
         genStage: null,
         saveStatus: 'idle',
+        lastNarrationId: 0,
+        lastNarrationText: '',
       }
     case 'SET_LOADED':
       return { ...state, loaded: true }
@@ -145,6 +156,17 @@ function reducer(state: State, action: Action): State {
       return { ...state, genStage: action.stage }
     case 'SET_SAVE_STATUS':
       return { ...state, saveStatus: action.status }
+    case 'SET_LAST_NARRATION':
+      return { ...state, lastNarrationId: state.lastNarrationId + 1, lastNarrationText: action.text }
+    case 'SET_TTS_AUTOPLAY':
+      return { ...state, tts: { ...state.tts, autoPlay: action.autoPlay } }
+    case 'SET_TTS_MODEL':
+      return { ...state, tts: { ...state.tts, activeModel: action.model } }
+    case 'SET_TTS_MODEL_SETTING': {
+      const perModel = { ...(state.tts.perModel || {}) }
+      perModel[action.model] = { ...(perModel[action.model] || {}), ...action.settings }
+      return { ...state, tts: { ...state.tts, perModel } }
+    }
     default:
       return state
   }
@@ -162,6 +184,8 @@ const initialState: State = {
   sumPreview: null,
   genStage: null,
   saveStatus: 'idle',
+  lastNarrationId: 0,
+  lastNarrationText: '',
 }
 
 export function useGameState() {
@@ -220,8 +244,8 @@ export function useGameState() {
     saveTimer.current = setTimeout(() => {
       dispatch({ type: 'SET_SAVE_STATUS', status: 'saving' })
       clearTimeout(savedResetTimer.current)
-      const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
-      api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq })
+      const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts } = state
+      api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts })
         .then(() => {
           dispatch({ type: 'SET_SAVE_STATUS', status: 'saved' })
           savedResetTimer.current = setTimeout(() => dispatch({ type: 'SET_SAVE_STATUS', status: 'idle' }), 2000)
@@ -231,7 +255,7 @@ export function useGameState() {
         })
     }, 1000)
     return () => clearTimeout(saveTimer.current)
-  }, [state.name, state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.modelRoles, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.loaded, state.phase, state.sessionId])
+  }, [state.name, state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.modelRoles, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.tts, state.loaded, state.phase, state.sessionId])
 
   // Trigger stats update after generation if needed (ref to avoid forward reference)
   const doUpdateStatsRef = useRef<() => void>(() => {})
@@ -278,6 +302,7 @@ export function useGameState() {
           dispatch({ type: 'SET_STREAMING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
+          if (text.trim()) dispatch({ type: 'SET_LAST_NARRATION', text: text.trim() })
 
           if (text.trim() && state.auFreq > 0 && state.secs.length > 0) {
             genCountRef.current++
@@ -445,9 +470,9 @@ export function useGameState() {
   const flushPendingSave = useCallback(async () => {
     clearTimeout(saveTimer.current)
     if (!state.sessionId || state.phase === 'hub') return
-    const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
+    const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts } = state
     try {
-      await api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq })
+      await api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts })
     } catch { /* ignore — 409 means user switched already, nothing to preserve */ }
   }, [state])
 

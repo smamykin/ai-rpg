@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import StoryArea from './StoryArea'
 import ActionInput from './ActionInput'
 import AIPanel from './panels/AIPanel'
@@ -11,10 +11,12 @@ import GenerateImageModal from './GenerateImageModal'
 import SaveAsScenarioModal from './SaveAsScenarioModal'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
-import type { GameState, GalleryImage } from '../types'
+import type { GameState, GalleryImage, TTSSettings } from '../types'
 import { useGallery } from '../hooks/useGallery'
 import { useToast } from '../hooks/useToast'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
+import { useTTS } from '../hooks/useTTS'
+import { getModelMeta, getModelSettings } from '../constants/tts'
 
 interface Props {
   state: {
@@ -39,6 +41,9 @@ interface Props {
     sumThreshold: number
     secs: GameState['secs']
     auFreq: number
+    tts: TTSSettings
+    lastNarrationId: number
+    lastNarrationText: string
     summing: boolean
     sumPreview: string | null
     stUp: boolean
@@ -87,6 +92,52 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   // Display preferences
   const dp = useDisplayPrefs()
+
+  // TTS playback
+  const tts = useTTS()
+  const activeModel = state.tts?.activeModel || 'Kokoro-82m'
+  const modelMeta = getModelMeta(activeModel)
+  const modelSettings = useMemo(() => getModelSettings(state.tts, activeModel), [state.tts, activeModel])
+  const buildTTSRequest = (text: string) => ({
+    text,
+    model: activeModel,
+    voice: modelSettings.voice || 'nova',
+    speed: modelSettings.speed,
+    instructions: modelMeta.supportsInstructions ? modelSettings.instructions : '',
+    dialogueVoice: modelMeta.supportsDialogueVoice ? modelSettings.dialogueVoice : '',
+  })
+
+  // Auto-play TTS on new AI narration
+  const seenNarrationId = useRef(0)
+  useEffect(() => {
+    if (!state.lastNarrationId || state.lastNarrationId === seenNarrationId.current) return
+    seenNarrationId.current = state.lastNarrationId
+    if (state.tts?.autoPlay && state.lastNarrationText.trim()) {
+      tts.playReplace(buildTTSRequest(state.lastNarrationText))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lastNarrationId])
+
+  // Speaker button: play the most recent AI narration (last paragraph block not starting with "> ")
+  const lastAINarration = useMemo(() => {
+    if (state.lastNarrationText.trim()) return state.lastNarrationText.trim()
+    const chunks = state.story.split(/\n\n/)
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const p = chunks[i].trim()
+      if (p && !p.startsWith('> ')) return p
+    }
+    return ''
+  }, [state.story, state.lastNarrationText])
+
+  const handleSpeakLast = () => {
+    if (!lastAINarration) return
+    tts.playAppend(buildTTSRequest(lastAINarration))
+  }
+
+  const handleReadAloud = (text: string) => {
+    if (!text.trim()) return
+    tts.playReplace(buildTTSRequest(text.trim()))
+  }
 
   // Swipe gesture for panels
   const rootRef = useRef<HTMLDivElement>(null)
@@ -305,6 +356,10 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onSetTheme={dp.setTheme}
         onSetFontFamily={dp.setFontFamily}
         onSetFontSize={dp.setFontSize}
+        tts={state.tts}
+        dispatch={dispatch}
+        ttsPlaying={tts.isPlaying || tts.isLoading}
+        onStopTTS={tts.stop}
       />
 
       {/* Generate Image Modal */}
@@ -344,6 +399,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         streaming={state.streaming}
         onChange={story => dispatch({ type: 'SET_STORY', story })}
         pinScroll={pinScroll}
+        onReadAloud={handleReadAloud}
       />
 
       {/* Status bars */}
@@ -391,6 +447,10 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onArcChange={v => setField('arc', v)}
         secsLength={state.secs.length}
         onShowTracking={() => openPanel('track')}
+        onSpeak={handleSpeakLast}
+        canSpeak={!!lastAINarration}
+        ttsBusy={tts.isPlaying || tts.isLoading}
+        onStopTTS={tts.stop}
       />
 
       {/* Toasts */}

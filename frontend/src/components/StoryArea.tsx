@@ -23,9 +23,10 @@ interface Props {
   streaming: string
   onChange: (story: string) => void
   pinScroll: boolean
+  onReadAloud: (text: string) => void
 }
 
-export default function StoryArea({ story, gen, streaming, onChange, pinScroll }: Props) {
+export default function StoryArea({ story, gen, streaming, onChange, pinScroll, onReadAloud }: Props) {
   const ta = useRef<HTMLTextAreaElement>(null)
   const rd = useRef<HTMLDivElement>(null)
   const [editing, setEditing] = useState(false)
@@ -116,6 +117,7 @@ export default function StoryArea({ story, gen, streaming, onChange, pinScroll }
             onReplace={handleReplace}
             onTransform={api.transform}
             onLoadingChange={setTransforming}
+            onReadAloud={onReadAloud}
           />
         )}
       </div>

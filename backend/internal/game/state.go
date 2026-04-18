@@ -33,11 +33,25 @@ type GameState struct {
 	SumThreshold int         `json:"sumThreshold"`
 	Secs         []Section   `json:"secs"`
 	AuFreq       int         `json:"auFreq"`
+	TTS          TTSSettings `json:"tts"`
 	Format       string      `json:"format,omitempty"`
 
 	// Legacy fields — consumed during migration, omitted after.
 	Mems    []Memory `json:"mems,omitempty"`
 	AddlMem string   `json:"addlMem,omitempty"`
+}
+
+type TTSSettings struct {
+	AutoPlay    bool                        `json:"autoPlay"`
+	ActiveModel string                      `json:"activeModel,omitempty"`
+	PerModel    map[string]TTSModelSettings `json:"perModel,omitempty"`
+}
+
+type TTSModelSettings struct {
+	Voice         string  `json:"voice,omitempty"`
+	Speed         float64 `json:"speed,omitempty"`
+	Instructions  string  `json:"instructions,omitempty"`
+	DialogueVoice string  `json:"dialogueVoice,omitempty"`
 }
 
 type Summary struct {

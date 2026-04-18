@@ -14,12 +14,17 @@ interface Props {
   onArcChange: (arc: string) => void
   secsLength: number
   onShowTracking: () => void
+  onSpeak: () => void
+  canSpeak: boolean
+  ttsBusy: boolean
+  onStopTTS: () => void
 }
 
 export default function ActionInput({
   gen, story, onSubmit, onContinue, onRegen, onDelete, onStop,
   showArc, onToggleArc, arc, onArcChange,
   secsLength, onShowTracking,
+  onSpeak, canSpeak, ttsBusy, onStopTTS,
 }: Props) {
   const [action, setAction] = useState('')
 
@@ -76,6 +81,11 @@ export default function ActionInput({
         <div className="ct">
           <button className="b bs" onClick={onRegen} disabled={gen || !story.trim()}>&#x1f501;</button>
           <button className="b bs" onClick={onDelete} disabled={gen || !story.trim()}>&#x1f5d1;</button>
+          {ttsBusy ? (
+            <button className="b bs" onClick={onStopTTS} title="Stop TTS" style={{ color: 'var(--dng)' }}>&#x23f9;</button>
+          ) : (
+            <button className="b bs" onClick={onSpeak} disabled={!canSpeak} title="Read last narration">&#x1f50a;</button>
+          )}
           <button className={`b bs${showArc ? ' ba' : ''}`} onClick={onToggleArc}>&#x1f3af;</button>
           <div style={{ flex: 1 }} />
           {secsLength === 0 && story.length > 100 && (

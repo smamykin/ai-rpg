@@ -1,9 +1,10 @@
-import type { GameState } from '../../types'
+import type { GameState, TTSSettings } from '../../types'
 import { STYLES } from '../../types'
 import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP } from '../../display'
 import type { DisplayPrefs } from '../../display'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
+import { TTS_MODELS, TTS_VOICES, getModelMeta, getModelSettings } from '../../constants/tts'
 
 interface Props {
   show: boolean
@@ -18,12 +19,26 @@ interface Props {
   onSetTheme: (id: string) => void
   onSetFontFamily: (name: string) => void
   onSetFontSize: (size: number) => void
+  tts: TTSSettings
+  dispatch: React.Dispatch<any>
+  ttsPlaying: boolean
+  onStopTTS: () => void
 }
 
 export default function SettingsPanel({
   show, onClose, style, cStyle, overview, diff, setField, onSwitch,
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize,
+  tts, dispatch, ttsPlaying, onStopTTS,
 }: Props) {
+  const activeModel = tts?.activeModel || 'Kokoro-82m'
+  const modelMeta = getModelMeta(activeModel)
+  const modelSettings = getModelSettings(tts, activeModel)
+  const voices = TTS_VOICES[activeModel] || []
+
+  const updateModelSetting = (key: 'voice' | 'speed' | 'instructions' | 'dialogueVoice', value: string | number) => {
+    dispatch({ type: 'SET_TTS_MODEL_SETTING', model: activeModel, settings: { [key]: value } })
+  }
+
   return (
     <>
       <div className={`ov ${show ? 'o' : ''}`} onClick={onClose} />
@@ -59,6 +74,75 @@ export default function SettingsPanel({
             <option value="hard">Hard (permadeath)</option>
           </select>
         </div>
+
+        <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
+          <label className="lb" style={{ marginBottom: '.5rem' }}>Text-to-Speech</label>
+        </div>
+
+        <div className="gr">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={!!tts?.autoPlay}
+              onChange={e => dispatch({ type: 'SET_TTS_AUTOPLAY', autoPlay: e.target.checked })}
+            />
+            <span>Auto-play new narration</span>
+          </label>
+          {ttsPlaying && (
+            <button className="b bs" onClick={onStopTTS} style={{ color: 'var(--dng)', marginTop: '.4rem' }}>&#x23f9; Stop playback</button>
+          )}
+        </div>
+
+        <div className="gr">
+          <label className="lb">TTS Model</label>
+          <select value={activeModel} onChange={e => dispatch({ type: 'SET_TTS_MODEL', model: e.target.value })}>
+            {TTS_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+          <div className="hint">${modelMeta.pricePer1K.toFixed(4)} per 1K chars.</div>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Voice</label>
+          <select value={modelSettings.voice} onChange={e => updateModelSetting('voice', e.target.value)}>
+            {voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Speed: {(modelSettings.speed || 1.0).toFixed(2)}x</label>
+          <input
+            type="range"
+            min={0.5}
+            max={2.0}
+            step={0.05}
+            value={modelSettings.speed || 1.0}
+            onChange={e => updateModelSetting('speed', parseFloat(e.target.value))}
+          />
+        </div>
+
+        {modelMeta.supportsInstructions && (
+          <div className="gr">
+            <label className="lb">Instructions</label>
+            <textarea
+              value={modelSettings.instructions || ''}
+              onChange={e => updateModelSetting('instructions', e.target.value)}
+              placeholder='e.g. "read in a dramatic whisper, like an ancient storyteller"'
+              rows={2}
+            />
+            <div className="hint">Natural-language voice direction.</div>
+          </div>
+        )}
+
+        {modelMeta.supportsDialogueVoice && (
+          <div className="gr">
+            <label className="lb">Dialogue voice (optional)</label>
+            <select value={modelSettings.dialogueVoice || ''} onChange={e => updateModelSetting('dialogueVoice', e.target.value)}>
+              <option value="">&mdash; none &mdash;</option>
+              {voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+            <div className="hint">If set, text in quotes uses this voice.</div>
+          </div>
+        )}
 
         <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
           <label className="lb" style={{ marginBottom: '.5rem' }}>Display</label>

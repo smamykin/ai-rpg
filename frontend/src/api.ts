@@ -224,6 +224,30 @@ export async function suggestName(
   return res.name
 }
 
+export interface TTSRequest {
+  text: string
+  model: string
+  voice: string
+  speed?: number
+  instructions?: string
+}
+
+export async function tts(req: TTSRequest, signal?: AbortSignal): Promise<Blob> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (currentSessionId) headers['X-Session-Id'] = currentSessionId
+  const res = await fetch(BASE + '/tts', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(req),
+    signal,
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+  }
+  return res.blob()
+}
+
 export async function transform(text: string, instruction: string): Promise<string> {
   const res = await fetchJSON<{ text: string }>('/transform', {
     method: 'POST',

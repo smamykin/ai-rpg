@@ -23,6 +23,19 @@ export interface Section {
   content: string
 }
 
+export interface TTSModelSettings {
+  voice?: string
+  speed?: number
+  instructions?: string
+  dialogueVoice?: string
+}
+
+export interface TTSSettings {
+  autoPlay: boolean
+  activeModel?: string
+  perModel?: Record<string, TTSModelSettings>
+}
+
 export interface GameState {
   sessionId: string
   name: string
@@ -46,6 +59,7 @@ export interface GameState {
   sumThreshold: number
   secs: Section[]
   auFreq: number
+  tts: TTSSettings
   format?: string
 
   // Legacy fields — present only in old saves before migration
@@ -161,6 +175,7 @@ export function defaultState(): GameState {
     sumThreshold: 2500,
     secs: [],
     auFreq: 0,
+    tts: { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
   }
 }
 

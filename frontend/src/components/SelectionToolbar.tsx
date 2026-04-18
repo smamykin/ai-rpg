@@ -5,9 +5,10 @@ interface Props {
   onReplace: (original: string, replacement: string) => void
   onTransform: (text: string, instruction: string) => Promise<string>
   onLoadingChange: (loading: boolean) => void
+  onReadAloud: (text: string) => void
 }
 
-export default function SelectionToolbar({ containerRef, onReplace, onTransform, onLoadingChange }: Props) {
+export default function SelectionToolbar({ containerRef, onReplace, onTransform, onLoadingChange, onReadAloud }: Props) {
   const [selected, setSelected] = useState('')
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [mode, setMode] = useState<'idle' | 'input' | 'loading'>('idle')
@@ -113,6 +114,7 @@ export default function SelectionToolbar({ containerRef, onReplace, onTransform,
         <>
           <button className="b bs" onClick={handleFix}>Fix</button>
           <button className="b bs" onClick={() => setMode('input')}>Make it&hellip;</button>
+          <button className="b bs" onClick={() => { onReadAloud(selected); dismiss() }} title="Read aloud">&#x1f50a;</button>
         </>
       )}
       {mode === 'input' && (

@@ -143,6 +143,21 @@ func (s *ScenarioStore) Delete(id string) error {
 	return nil
 }
 
+// DeleteAll removes every scenario file.
+func (s *ScenarioStore) DeleteAll() error {
+	entries, err := os.ReadDir(s.dir())
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		_ = os.Remove(filepath.Join(s.dir(), e.Name()))
+	}
+	return nil
+}
+
 // InstantiateSession builds a fresh GameState from a scenario — copies setup fields,
 // leaves story/summaries/sumUpTo at their zero values. The returned state is NOT persisted.
 func (s *ScenarioStore) InstantiateSession(scenarioID string) (*game.GameState, error) {
