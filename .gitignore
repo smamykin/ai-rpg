@@ -4,3 +4,6 @@ backend/tmp/
 data/
 frontend/node_modules/
 frontend/dist/
+.claude
+ai-rpg-prototype.html
+leonardo-studio (1).html

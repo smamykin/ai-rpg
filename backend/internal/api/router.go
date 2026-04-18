@@ -64,6 +64,11 @@ func NewRouter(cfg *Config) *chi.Mux {
 	r.Post("/api/summarize", h.Summarize)
 	r.Post("/api/update-stats", h.UpdateStats)
 
+	r.Get("/api/image-models", h.GetImageModels)
+	r.Post("/api/images/generate", h.GenerateImages)
+	r.Post("/api/images/enhance-prompt", h.EnhanceImagePrompt)
+	r.Post("/api/lore/generate", h.GenerateLore)
+
 	r.Get("/api/state", h.GetState)
 	r.Put("/api/state", h.PutState)
 	r.Delete("/api/state", h.DeleteState)

@@ -6,7 +6,10 @@ import MemoryPanel from './panels/MemoryPanel'
 import TrackingPanel from './panels/TrackingPanel'
 import SettingsPanel from './panels/SettingsPanel'
 import MenuPanel from './panels/MenuPanel'
-import type { GameState } from '../types'
+import GalleryPanel from './panels/GalleryPanel'
+import GenerateImageModal from './GenerateImageModal'
+import type { GameState, GalleryImage } from '../types'
+import { useGallery } from '../hooks/useGallery'
 
 interface Props {
   state: {
@@ -65,7 +68,24 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [showArc, setShowArc] = useState(false)
   const [cfm, setCfm] = useState(false)
 
+  // Gallery
+  const [showGallery, setShowGallery] = useState(false)
+  const [showGenModal, setShowGenModal] = useState(false)
+  const [genSource, setGenSource] = useState<'story' | 'lore'>('story')
+  const [genLoreId, setGenLoreId] = useState<string | undefined>()
+  const gallery = useGallery()
+
   const memCount = state.summaries.length + state.lore.length
+
+  const openGenModal = (source: 'story' | 'lore', loreId?: string) => {
+    setGenSource(source)
+    setGenLoreId(loreId)
+    setShowGenModal(true)
+  }
+
+  const handleImagesGenerated = (imgs: GalleryImage[]) => {
+    gallery.addImages(imgs)
+  }
 
   return (
     <div className="R">
@@ -75,6 +95,9 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
           <button className="b bs" onClick={() => setShowMem(s => !s)}>
             Memory{memCount > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{memCount}</span>}
+          </button>
+          <button className="b bs" onClick={() => setShowGallery(s => !s)}>
+            Gallery{gallery.count > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{gallery.count}</span>}
           </button>
           <button className="b bs" onClick={() => setShowSt(s => !s)}>
             Track{state.secs.length > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{state.secs.length}</span>}
@@ -125,6 +148,18 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onSummarize={() => actions.doSummarize(false)}
         onConfirmSummary={actions.confirmSummary}
         onDismissSummary={actions.dismissSummary}
+        galleryImages={gallery.images}
+        onGenerateImage={(loreId) => openGenModal('lore', loreId)}
+        story={state.story}
+        overview={state.overview}
+      />
+
+      <GalleryPanel
+        show={showGallery} onClose={() => setShowGallery(false)}
+        images={gallery.images}
+        onNewImage={() => openGenModal('story')}
+        onDelete={gallery.removeImage}
+        onClearAll={gallery.clearAll}
       />
 
       <TrackingPanel
@@ -139,6 +174,22 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         style={state.style} cStyle={state.cStyle}
         overview={state.overview} diff={state.diff}
         setField={setField}
+      />
+
+      {/* Generate Image Modal */}
+      <GenerateImageModal
+        open={showGenModal}
+        onClose={() => setShowGenModal(false)}
+        onImagesGenerated={handleImagesGenerated}
+        gameState={{
+          story: state.story,
+          summaries: state.summaries,
+          lore: state.lore,
+          overview: state.overview,
+          sumUpTo: 0,
+        }}
+        defaultSource={genSource}
+        defaultLoreEntryId={genLoreId}
       />
 
       {/* Story */}

@@ -54,6 +54,31 @@ export interface ModelInfo {
   price: number | null
 }
 
+export interface ImageModelInfo {
+  id: string
+  name: string
+}
+
+export interface GalleryImage {
+  id: string
+  url: string
+  prompt: string
+  model: string
+  width: number
+  height: number
+  createdAt: number
+  source: 'story' | 'lore'
+  loreEntryId?: string
+}
+
+export const DIMENSION_PRESETS = [
+  { label: '1:1', w: 1024, h: 1024 },
+  { label: '4:3', w: 1024, h: 768 },
+  { label: '3:4', w: 768, h: 1024 },
+  { label: '16:9', w: 1216, h: 832 },
+  { label: '9:16', w: 832, h: 1216 },
+] as const
+
 export type Phase = 'setup' | 'playing'
 export type Task = 'open' | 'action' | 'continue'
 

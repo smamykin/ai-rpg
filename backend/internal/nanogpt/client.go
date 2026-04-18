@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	BaseURL       = "https://nano-gpt.com/api/v1"
-	ChatEndpoint  = BaseURL + "/chat/completions"
-	ModelsEndpoint = BaseURL + "/models"
+	BaseURL              = "https://nano-gpt.com/api/v1"
+	ChatEndpoint         = BaseURL + "/chat/completions"
+	ModelsEndpoint       = BaseURL + "/models"
+	ImageEndpoint        = "https://nano-gpt.com/v1/images/generations"
+	ImageModelsEndpoint  = BaseURL + "/image-models"
 )
 
 type Client struct {
@@ -67,6 +69,116 @@ type ModelResponse struct {
 	Name    string  `json:"name,omitempty"`
 	Ctx     int      `json:"ctx"`
 	Price   *float64 `json:"price"`
+}
+
+// Image generation types.
+
+type ImageModel struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+type ImageResult struct {
+	URL     string `json:"url,omitempty"`
+	B64JSON string `json:"b64_json,omitempty"`
+}
+
+// GenerateImage sends an image generation request to NanoGPT.
+func (c *Client) GenerateImage(ctx context.Context, model, prompt string, n, width, height int) ([]ImageResult, error) {
+	// Build request body — gpt-image models use different fields
+	var body map[string]any
+	if strings.HasPrefix(model, "gpt-image") {
+		body = map[string]any{
+			"model":      model,
+			"prompt":     prompt,
+			"quality":    "low",
+			"resolution": fmt.Sprintf("%dx%d", width, height),
+			"nImages":    n,
+		}
+	} else {
+		body = map[string]any{
+			"model":           model,
+			"prompt":          prompt,
+			"n":               n,
+			"size":            fmt.Sprintf("%dx%d", width, height),
+			"response_format": "url",
+		}
+	}
+
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", ImageEndpoint, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
+
+	imgClient := &http.Client{Timeout: 120 * time.Second}
+	resp, err := imgClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(b))
+	}
+
+	var raw struct {
+		Data []ImageResult `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	if len(raw.Data) == 0 {
+		return nil, fmt.Errorf("no images returned")
+	}
+	return raw.Data, nil
+}
+
+// FetchImageModels retrieves the list of available image models.
+func (c *Client) FetchImageModels(ctx context.Context) ([]ImageModel, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", ImageModelsEndpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	var raw struct {
+		Data []json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+
+	models := make([]ImageModel, 0, len(raw.Data))
+	for _, d := range raw.Data {
+		// Models can be objects or plain strings
+		var m ImageModel
+		if err := json.Unmarshal(d, &m); err == nil && m.ID != "" {
+			models = append(models, m)
+			continue
+		}
+		var s string
+		if err := json.Unmarshal(d, &s); err == nil && s != "" {
+			models = append(models, ImageModel{ID: s, Name: s})
+		}
+	}
+	return models, nil
 }
 
 // Complete sends a non-streaming chat completion request.

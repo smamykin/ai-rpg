@@ -224,3 +224,59 @@ select {
 
 /* Loading */
 .load-splash { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--mt); font-size: .9rem; }
+
+/* ---- Gallery & Image Generation ---- */
+
+/* Generate Image Modal */
+.gm-ov { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.7); display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; overflow-y: auto; }
+.gm { background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; width: min(480px, 94vw); padding: 1rem; }
+.gm .ph { margin-bottom: .6rem; }
+.gm-tabs { display: flex; gap: .3rem; margin-bottom: .6rem; }
+.gm-ctx { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .6rem; }
+.gm-ctx label { display: flex; align-items: center; gap: .4rem; font-size: .82rem; cursor: pointer; }
+.gm-ctx input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; }
+.gm-dims { display: flex; gap: .3rem; flex-wrap: wrap; }
+.gm-gen { width: 100%; padding: .7rem; font-size: .95rem; font-weight: 600; }
+.gm-sl { display: flex; align-items: center; gap: .6rem; margin-bottom: .6rem; }
+.gm-sl .lb { margin-bottom: 0; }
+.gm-sl input[type=range] { flex: 1; accent-color: var(--ac); }
+.gm-sv { font-size: .88rem; font-weight: 600; color: var(--ac); min-width: 1.5rem; text-align: center; }
+.gm-dd { position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; z-index: 70; background: var(--sf2); border: 1px solid var(--bd); border-radius: 0 0 8px 8px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.gm-dd-opt { padding: .45rem .6rem; font-size: .78rem; cursor: pointer; color: var(--mt); border-bottom: 1px solid rgba(46,41,34,.5); }
+.gm-dd-opt:hover { background: rgba(212,168,67,.1); color: var(--tx); }
+.gm-dd-opt.sel { color: var(--ac); font-weight: 500; }
+
+/* Gallery grid */
+.gl { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: .4rem; }
+.gi { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--bd); cursor: pointer; background: var(--bg); }
+.gi img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gi:hover .gi-ov, .gi:active .gi-ov { opacity: 1; }
+.gi-ov { position: absolute; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: flex-end; gap: .2rem; padding: .3rem; opacity: 0; transition: opacity .15s; }
+
+/* Lightbox */
+.lbx { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+.lbx-img { max-width: calc(100% - 80px); max-height: 65vh; border-radius: 8px; object-fit: contain; }
+.lbx-cl { position: absolute; top: .8rem; right: .8rem; font-size: 1.2rem; z-index: 101; }
+.lbx-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.5); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.3rem; z-index: 101; }
+.lbx-nav:hover { background: rgba(255,255,255,.15); }
+.lbx-prev { left: .8rem; }
+.lbx-next { right: .8rem; }
+.lbx-act { display: flex; gap: .5rem; margin-top: .8rem; }
+.lbx-pr { max-width: 500px; text-align: center; margin-top: .6rem; font-size: .75rem; color: var(--mt); line-height: 1.4; max-height: 50px; overflow: hidden; }
+
+/* Lore list cards */
+.lc { display: flex; align-items: center; gap: .5rem; padding: .5rem; background: var(--bg); border: 1px solid var(--bd); border-radius: 8px; margin-bottom: .4rem; cursor: pointer; min-height: 52px; transition: background .15s; }
+.lc:active { background: var(--sf2); }
+.lc-th { width: 42px; height: 42px; border-radius: 6px; background: var(--sf2); border: 1px solid var(--bd); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--mt); font-size: .9rem; font-weight: 600; }
+.lc-th img { width: 100%; height: 100%; object-fit: cover; }
+.lc-nm { flex: 1; font-size: .88rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-tg { font-size: .65rem; padding: .15rem .4rem; border-radius: 10px; font-weight: 500; flex-shrink: 0; }
+
+/* Lore detail image area */
+.ld-img { width: 100%; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--bd); margin-bottom: .6rem; display: flex; align-items: center; justify-content: center; }
+.ld-img img { max-width: 100%; max-height: 300px; object-fit: contain; display: block; border-radius: 8px; }
+.ld-ph { color: var(--mt); font-size: .82rem; text-align: center; padding: 2rem 0; }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spn { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: .4rem; }

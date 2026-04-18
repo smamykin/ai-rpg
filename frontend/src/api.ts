@@ -1,4 +1,4 @@
-import type { GameState, ModelInfo, Section } from './types'
+import type { GameState, ModelInfo, ImageModelInfo, Section } from './types'
 
 const BASE = '/api'
 
@@ -66,6 +66,59 @@ export async function updateStats(
     body: JSON.stringify({ sections, story }),
   })
   return res.sections
+}
+
+export async function getImageModels(): Promise<ImageModelInfo[]> {
+  const res = await fetchJSON<{ models: ImageModelInfo[] }>('/image-models')
+  return res.models
+}
+
+export async function generateImages(
+  model: string,
+  prompt: string,
+  n: number,
+  width: number,
+  height: number
+): Promise<{ url: string }[]> {
+  const res = await fetchJSON<{ images: { url: string }[] }>('/images/generate', {
+    method: 'POST',
+    body: JSON.stringify({ model, prompt, n, width, height }),
+  })
+  return res.images
+}
+
+export async function enhanceImagePrompt(
+  instructions: string,
+  context: {
+    recentStory?: string
+    summaries?: string
+    overview?: string
+    loreEntries?: { name: string; text: string }[]
+  }
+): Promise<string> {
+  const res = await fetchJSON<{ prompt: string }>('/images/enhance-prompt', {
+    method: 'POST',
+    body: JSON.stringify({ instructions, context }),
+  })
+  return res.prompt
+}
+
+export async function generateLore(
+  name: string,
+  tag: string,
+  instructions: string,
+  context: {
+    recentStory?: string
+    summaries?: string
+    overview?: string
+    loreEntries?: { name: string; text: string }[]
+  }
+): Promise<string> {
+  const res = await fetchJSON<{ text: string }>('/lore/generate', {
+    method: 'POST',
+    body: JSON.stringify({ name, tag, instructions, context }),
+  })
+  return res.text
 }
 
 export interface GenerateCallbacks {
