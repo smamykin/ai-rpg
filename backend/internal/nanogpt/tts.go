@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -37,6 +38,7 @@ func (c *Client) TextToSpeech(ctx context.Context, req TTSRequest) ([]byte, stri
 		return nil, "", fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", c.APIKey)
 	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	ttsClient := &http.Client{Timeout: 120 * time.Second}
@@ -47,8 +49,22 @@ func (c *Client) TextToSpeech(ctx context.Context, req TTSRequest) ([]byte, stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1000))
 		return nil, "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(b))
+	}
+
+	ct := resp.Header.Get("Content-Type")
+
+	// OpenAI-family models return binary audio directly; others return JSON with audioUrl.
+	if !strings.Contains(ct, "json") {
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, "", fmt.Errorf("read audio: %w", err)
+		}
+		if ct == "" {
+			ct = "audio/mpeg"
+		}
+		return data, ct, nil
 	}
 
 	var parsed ttsResponse

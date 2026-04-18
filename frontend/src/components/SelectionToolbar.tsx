@@ -114,7 +114,11 @@ export default function SelectionToolbar({ containerRef, onReplace, onTransform,
         <>
           <button className="b bs" onClick={handleFix}>Fix</button>
           <button className="b bs" onClick={() => setMode('input')}>Make it&hellip;</button>
-          <button className="b bs" onClick={() => { onReadAloud(selected); dismiss() }} title="Read aloud">&#x1f50a;</button>
+          <button
+            className="b bs"
+            title="Read aloud"
+            onClick={e => { e.stopPropagation(); onReadAloud(selected); dismiss() }}
+          >&#x1f50a;</button>
         </>
       )}
       {mode === 'input' && (

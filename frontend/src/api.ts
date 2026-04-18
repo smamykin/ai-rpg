@@ -47,6 +47,13 @@ export async function deleteState(): Promise<void> {
   await fetchJSON('/state', { method: 'DELETE' })
 }
 
+export async function resetAllData(): Promise<void> {
+  await fetch(BASE + '/data/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 export async function exportState(): Promise<Blob> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (currentSessionId) headers['X-Session-Id'] = currentSessionId

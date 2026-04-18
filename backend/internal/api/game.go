@@ -121,6 +121,20 @@ func (h *Handlers) ExportState(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ResetAllData wipes every session and scenario from disk.
+func (h *Handlers) ResetAllData(w http.ResponseWriter, r *http.Request) {
+	if err := h.sessions.DeleteAll(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := h.scenarios.DeleteAll(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 // ImportState creates a new session from JSON and sets it as current.
 func (h *Handlers) ImportState(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, 25<<20)) // 25MB

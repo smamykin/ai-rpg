@@ -36,29 +36,45 @@ func (h *Handlers) GenerateLore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := h.sessions.LoadCurrent()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Tolerate no current session — scenario editing runs without one.
+	// Context comes from the request body; state is only needed for model-role overrides.
+	state, _ := h.sessions.LoadCurrent()
 	model := h.resolveModel("loreGen", state)
 
-	systemPrompt := `You are a lore keeper for a text-based RPG. Given a name and category, extract and compile everything known about this subject from the provided story context.
+	systemPrompt := `You are a lore keeper for a text-based RPG. Extract and compile everything known about the subject from the provided story context.
 
 Rules:
 - Output ONLY the lore entry text, nothing else.
 - Write in present tense, encyclopedic style.
-- Include all known facts: appearance, personality, abilities, relationships, history, location, significance.
-- If little is known, write what IS known and note what remains unclear.
 - Be concise but thorough. Aim for 2-5 sentences.
 - Do NOT invent facts not supported by the context.
-- If the user provides specific instructions, follow them.`
+- If little is known, write what IS known and note what remains unclear.
+- User instructions (when present) override every rule above.`
+
+	focusByTag := map[string]string{
+		"character": "Role or occupation, appearance, demeanor, relationships, goals, secrets.",
+		"world":     "Location or extent, history, culture, notable features, role in the story.",
+		"rule":      "When and where it applies, exact constraints, exceptions, consequences of breaking it.",
+		"quest":     "Giver, objective, reward, complications, current state.",
+		"other":     "Whatever is most salient about the subject.",
+	}
 
 	var sb strings.Builder
 	if strings.TrimSpace(req.Name) != "" {
 		fmt.Fprintf(&sb, "Create a lore entry for: %s (category: %s)\n", req.Name, req.Tag)
 	} else {
 		fmt.Fprintf(&sb, "Create a lore entry (category: %s)\n", req.Tag)
+	}
+
+	if focus, ok := focusByTag[req.Tag]; ok {
+		fmt.Fprintf(&sb, "Focus areas: %s\n", focus)
+	}
+
+	// One-shot example — only for character entries, where a concrete template lifts quality the most.
+	if req.Tag == "character" {
+		sb.WriteString("\nExample:\n")
+		sb.WriteString("Request: Create a lore entry for Mira (character)\n")
+		sb.WriteString("Entry: Mira is a former caravan guard turned courier in the lower district. Lean and quick, with a scar along her left jaw from a roadside ambush she refuses to discuss. Loyal to few but fiercely so; owes a debt to the innkeeper Calum. Wants out of the city but cannot leave until the debt is paid.\n")
 	}
 
 	if strings.TrimSpace(req.Instructions) != "" {

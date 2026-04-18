@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -58,6 +59,7 @@ func (h *Handlers) TextToSpeech(w http.ResponseWriter, r *http.Request) {
 		Instructions: req.Instructions,
 	})
 	if err != nil {
+		log.Printf("TTS error (model=%s voice=%s): %v", req.Model, req.Voice, err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}

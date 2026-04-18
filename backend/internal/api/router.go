@@ -86,6 +86,7 @@ func NewRouter(cfg *Config) *chi.Mux {
 	r.Delete("/api/state", h.DeleteState)
 	r.Post("/api/state/export", h.ExportState)
 	r.Post("/api/state/import", h.ImportState)
+	r.Post("/api/data/reset", h.ResetAllData)
 
 	r.Get("/api/sessions", h.ListSessions)
 	r.Post("/api/sessions", h.CreateSession)

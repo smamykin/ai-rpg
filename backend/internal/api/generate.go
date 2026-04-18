@@ -26,14 +26,15 @@ type UpdateStatsRequest struct {
 }
 
 // resolveSupportModel picks the support model: state → env support → env story → state story.
+// Tolerates a nil state (e.g. suggest-name called while on the hub with no current session).
 func (h *Handlers) resolveSupportModel(state *game.GameState) string {
-	if state.SupportModel != "" {
+	if state != nil && state.SupportModel != "" {
 		return state.SupportModel
 	}
 	if h.cfg.SupportModel != "" {
 		return h.cfg.SupportModel
 	}
-	if state.StoryModel != "" {
+	if state != nil && state.StoryModel != "" {
 		return state.StoryModel
 	}
 	return h.cfg.StoryModel

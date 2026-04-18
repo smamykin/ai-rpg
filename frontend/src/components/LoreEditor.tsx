@@ -130,19 +130,23 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
         &#x2190; Back
       </button>
 
-      {img ? (
-        <div className="ld-img" onClick={() => setLbImg(img)} style={{ cursor: 'pointer' }}>
-          <img src={img.url} alt={selected.name} />
-        </div>
-      ) : (
-        <div className="ld-img"><span className="ld-ph">No image</span></div>
-      )}
-      {onGenerateImage && (
-        <button
-          className="b bs"
-          style={{ width: '100%', marginBottom: '.6rem' }}
-          onClick={() => onGenerateImage(selected.id)}
-        >Generate Image</button>
+      {(img || onGenerateImage) && (
+        <>
+          {img ? (
+            <div className="ld-img" onClick={() => setLbImg(img)} style={{ cursor: 'pointer' }}>
+              <img src={img.url} alt={selected.name} />
+            </div>
+          ) : (
+            <div className="ld-img"><span className="ld-ph">No image</span></div>
+          )}
+          {onGenerateImage && (
+            <button
+              className="b bs"
+              style={{ width: '100%', marginBottom: '.6rem' }}
+              onClick={() => onGenerateImage(selected.id)}
+            >Generate Image</button>
+          )}
+        </>
       )}
 
       <div className="gr">

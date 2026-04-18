@@ -77,15 +77,20 @@ export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRen
           <div className="hub-list">
             {sessions.map(s => (
               <div key={s.id} className={`hub-card ${s.id === current ? 'hub-cur' : ''}`}>
-                <div className="hub-card-body" onClick={() => s.id !== current && onSwitch(s.id)}>
+                <div
+                  className="hub-card-body"
+                  onClick={() => { if (editingId === s.id) { commitEdit() } else { onSwitch(s.id) } }}
+                >
                   {editingId === s.id ? (
-                    <div style={{ display: 'flex', gap: '.3rem', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                    <div
+                      style={{ display: 'flex', gap: '.3rem', alignItems: 'center' }}
+                      onClick={e => e.stopPropagation()}
+                    >
                       <input
                         type="text"
                         value={editName}
                         autoFocus
                         onChange={e => setEditName(e.target.value)}
-                        onBlur={commitEdit}
                         onKeyDown={e => { if (e.key === 'Enter') commitEdit(); else if (e.key === 'Escape') setEditingId(null) }}
                         className="hub-name-in"
                         style={{ flex: 1 }}
@@ -97,6 +102,8 @@ export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRen
                         disabled={!s.overviewHead}
                         onSuggest={n => setEditName(n)}
                       />
+                      <button className="sgn" onClick={commitEdit} title="Save name">&#x2713; Save</button>
+                      <button className="sgn" onClick={() => setEditingId(null)} title="Cancel">&#x2715;</button>
                     </div>
                   ) : (
                     <div className="hub-name">{s.name || 'Adventure'}</div>

@@ -14,20 +14,29 @@ interface Props {
 
 export default function SuggestNameButton({ kind, text, tag, context, disabled, onSuggest, label }: Props) {
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
 
   const click = async () => {
     if (busy || disabled) return
-    setBusy(true)
+    setBusy(true); setErr('')
     try {
       const name = await api.suggestName(kind, text, tag, context)
       if (name) onSuggest(name)
-    } catch { /* ignore */ }
+    } catch (e) {
+      setErr((e as Error).message || 'Failed')
+    }
     setBusy(false)
   }
 
   return (
-    <button className="sgn" onClick={click} disabled={busy || disabled} title="Suggest a name">
-      {busy ? <span className="sgn-sp">&#x21bb;</span> : '\u2728'} {label ?? 'Suggest'}
+    <button
+      className="sgn"
+      onClick={click}
+      disabled={busy || disabled}
+      title={err || 'Suggest a name'}
+      style={err ? { borderColor: 'var(--dng)', color: 'var(--dng)' } : undefined}
+    >
+      {busy ? <span className="sgn-sp">&#x21bb;</span> : err ? '\u26A0' : '\u2728'} {label ?? 'Suggest'}
     </button>
   )
 }

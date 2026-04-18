@@ -102,11 +102,8 @@ func (h *Handlers) EnhanceImagePrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := h.sessions.LoadCurrent()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Tolerate no current session — image-prompt generation may run from scenario authoring.
+	state, _ := h.sessions.LoadCurrent()
 	model := h.resolveModel("imagePrompt", state)
 
 	systemPrompt := `You are an expert AI image prompt engineer for RPG illustration. Create a vivid, detailed image generation prompt based on the provided context and instructions.

@@ -5,6 +5,7 @@ import type { DisplayPrefs } from '../../display'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
 import { TTS_MODELS, TTS_VOICES, getModelMeta, getModelSettings } from '../../constants/tts'
+import * as api from '../../api'
 
 interface Props {
   show: boolean
@@ -37,6 +38,19 @@ export default function SettingsPanel({
 
   const updateModelSetting = (key: 'voice' | 'speed' | 'instructions' | 'dialogueVoice', value: string | number) => {
     dispatch({ type: 'SET_TTS_MODEL_SETTING', model: activeModel, settings: { [key]: value } })
+  }
+
+  const handleClearAllData = async () => {
+    if (!window.confirm('Delete all sessions, scenarios, gallery images, and local preferences? This cannot be undone.')) return
+    if (!window.confirm('Really? Everything will be wiped and the app will reload.')) return
+    try {
+      await api.resetAllData()
+    } catch { /* ignore — we're wiping anyway */ }
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('ai-rpg-')) localStorage.removeItem(k)
+    }
+    location.reload()
   }
 
   return (
@@ -199,6 +213,21 @@ export default function SettingsPanel({
               disabled={displayPrefs.fontSize >= FONT_SIZE_MAX}
             >+</button>
           </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
+          <label className="lb" style={{ marginBottom: '.5rem', color: 'var(--dng)' }}>Danger Zone</label>
+        </div>
+
+        <div className="gr">
+          <button
+            className="b"
+            onClick={handleClearAllData}
+            style={{ color: 'var(--dng)', borderColor: 'var(--dng)' }}
+          >
+            Clear all data
+          </button>
+          <div className="hint">Deletes all sessions, scenarios, gallery images, and local preferences (including TTS settings). Cannot be undone.</div>
         </div>
       </div>
     </>
