@@ -40,6 +40,9 @@ func (s *FileStore) Load() (*game.GameState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("unmarshal state: %w", err)
 	}
+	if state.Migrate() {
+		_ = s.Save(&state)
+	}
 	return &state, nil
 }
 
@@ -70,7 +73,7 @@ func (s *FileStore) ExportJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	state.Format = "ai-rpg-nano-v1"
+	state.Format = "ai-rpg-nano-v2"
 	return json.MarshalIndent(state, "", "  ")
 }
 
@@ -80,6 +83,7 @@ func (s *FileStore) ImportJSON(data []byte) (*game.GameState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("unmarshal import: %w", err)
 	}
+	state.Migrate()
 	if err := s.Save(&state); err != nil {
 		return nil, err
 	}

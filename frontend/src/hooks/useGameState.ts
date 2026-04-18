@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, Memory, Section, Phase } from '../types'
+import type { GameState, Summary, LoreEntry, Section, Phase } from '../types'
 import { defaultState, uid, wordCount } from '../types'
 import * as api from '../api'
 
@@ -11,6 +11,7 @@ interface State extends GameState {
   summing: boolean
   stUp: boolean
   loaded: boolean
+  sumPreview: string | null
 }
 
 type Action =
@@ -22,10 +23,16 @@ type Action =
   | { type: 'SET_SUMMING'; summing: boolean }
   | { type: 'SET_STUP'; stUp: boolean }
   | { type: 'SET_STORY'; story: string }
-  | { type: 'ADD_MEM'; mem: Memory }
-  | { type: 'UPDATE_MEM'; id: string; text: string }
-  | { type: 'REMOVE_MEM'; id: string }
-  | { type: 'SET_MEMS'; mems: Memory[] }
+  | { type: 'ADD_SUMMARY'; summary: Summary }
+  | { type: 'UPDATE_SUMMARY'; id: string; text: string }
+  | { type: 'REMOVE_SUMMARY'; id: string }
+  | { type: 'SET_SUMMARIES'; summaries: Summary[] }
+  | { type: 'ADD_LORE'; entry: LoreEntry }
+  | { type: 'UPDATE_LORE'; id: string; updates: Partial<LoreEntry> }
+  | { type: 'REMOVE_LORE'; id: string }
+  | { type: 'TOGGLE_LORE'; id: string }
+  | { type: 'SET_LORE'; lore: LoreEntry[] }
+  | { type: 'SET_SUM_PREVIEW'; text: string | null }
   | { type: 'ADD_SEC'; sec: Section }
   | { type: 'UPDATE_SEC'; id: string; content: string }
   | { type: 'REMOVE_SEC'; id: string }
@@ -52,14 +59,32 @@ function reducer(state: State, action: Action): State {
       return { ...state, stUp: action.stUp }
     case 'SET_STORY':
       return { ...state, story: action.story }
-    case 'ADD_MEM':
-      return { ...state, mems: [...state.mems, action.mem] }
-    case 'UPDATE_MEM':
-      return { ...state, mems: state.mems.map(m => m.id === action.id ? { ...m, text: action.text } : m) }
-    case 'REMOVE_MEM':
-      return { ...state, mems: state.mems.filter(m => m.id !== action.id) }
-    case 'SET_MEMS':
-      return { ...state, mems: action.mems }
+
+    // Summaries
+    case 'ADD_SUMMARY':
+      return { ...state, summaries: [...state.summaries, action.summary] }
+    case 'UPDATE_SUMMARY':
+      return { ...state, summaries: state.summaries.map(s => s.id === action.id ? { ...s, text: action.text } : s) }
+    case 'REMOVE_SUMMARY':
+      return { ...state, summaries: state.summaries.filter(s => s.id !== action.id) }
+    case 'SET_SUMMARIES':
+      return { ...state, summaries: action.summaries }
+
+    // Lore
+    case 'ADD_LORE':
+      return { ...state, lore: [...state.lore, action.entry] }
+    case 'UPDATE_LORE':
+      return { ...state, lore: state.lore.map(l => l.id === action.id ? { ...l, ...action.updates } : l) }
+    case 'REMOVE_LORE':
+      return { ...state, lore: state.lore.filter(l => l.id !== action.id) }
+    case 'TOGGLE_LORE':
+      return { ...state, lore: state.lore.map(l => l.id === action.id ? { ...l, enabled: !l.enabled } : l) }
+    case 'SET_LORE':
+      return { ...state, lore: action.lore }
+
+    case 'SET_SUM_PREVIEW':
+      return { ...state, sumPreview: action.text }
+
     case 'ADD_SEC':
       return { ...state, secs: [...state.secs, action.sec] }
     case 'UPDATE_SEC':
@@ -74,6 +99,7 @@ function reducer(state: State, action: Action): State {
         ...action.state,
         phase: action.state.story ? 'playing' : 'setup',
         loaded: true,
+        sumPreview: null,
       }
     case 'RESET':
       return {
@@ -85,6 +111,7 @@ function reducer(state: State, action: Action): State {
         summing: false,
         stUp: false,
         loaded: true,
+        sumPreview: null,
       }
     case 'SET_LOADED':
       return { ...state, loaded: true }
@@ -102,6 +129,7 @@ const initialState: State = {
   summing: false,
   stUp: false,
   loaded: false,
+  sumPreview: null,
 }
 
 export function useGameState() {
@@ -110,6 +138,8 @@ export function useGameState() {
   const beforeRef = useRef('')
   const genCountRef = useRef(0)
   const [pendingStatsUpdate, setPendingStatsUpdate] = useState(false)
+  const [pendingSummarize, setPendingSummarize] = useState(false)
+  const pendingSumRange = useRef<[number, number]>([0, 0])
 
   // Load state from server on mount
   useEffect(() => {
@@ -124,14 +154,15 @@ export function useGameState() {
     if (!state.loaded) return
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      const { story, overview, style, cStyle, storyModel, supportModel, arc, diff, mems, addlMem, sumUpTo, secs, auFreq } = state
-      api.saveState({ story, overview, style, cStyle, storyModel, supportModel, arc, diff, mems, addlMem, sumUpTo, secs, auFreq }).catch(() => {})
+      const { story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq } = state
+      api.saveState({ story, overview, style, cStyle, storyModel, supportModel, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq }).catch(() => {})
     }, 1000)
     return () => clearTimeout(saveTimer.current)
-  }, [state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.arc, state.diff, state.mems, state.addlMem, state.sumUpTo, state.secs, state.auFreq, state.loaded])
+  }, [state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.loaded])
 
   // Trigger stats update after generation if needed (ref to avoid forward reference)
   const doUpdateStatsRef = useRef<() => void>(() => {})
+  const doSummarizeRef = useRef<(autoTriggered: boolean) => void>(() => {})
 
   const setField = useCallback(<K extends keyof GameState>(field: K, value: GameState[K]) => {
     dispatch({ type: 'SET_FIELD', field, value })
@@ -177,6 +208,14 @@ export function useGameState() {
             if (genCountRef.current >= state.auFreq) {
               genCountRef.current = 0
               setPendingStatsUpdate(true)
+            }
+          }
+
+          // Auto-summarization check
+          if (text.trim() && state.autoSum) {
+            const threshold = state.sumThreshold || 2500
+            if (finalStory.length > state.sumUpTo + threshold) {
+              setPendingSummarize(true)
             }
           }
         },
@@ -239,26 +278,54 @@ export function useGameState() {
     }, 500)
   }, [])
 
-  const doSummarize = useCallback(async () => {
-    const KR = 2000
-    const canS = state.story.length > state.sumUpTo + KR + 500
+  const doSummarize = useCallback(async (autoTriggered = false) => {
+    const threshold = state.sumThreshold || 2500
+    const KR = Math.floor(threshold * 0.8)
+    const canS = state.story.length > state.sumUpTo + threshold
     if (!canS || state.summing) return
 
-    const textToSum = state.story.slice(state.sumUpTo, state.story.length - KR)
+    const from = state.sumUpTo
+    const to = state.story.length - KR
+    const textToSum = state.story.slice(from, to)
     dispatch({ type: 'SET_SUMMING', summing: true })
     dispatch({ type: 'SET_ERR', err: '' })
 
     try {
       const summary = await api.summarize(textToSum)
       if (summary.trim()) {
-        dispatch({ type: 'ADD_MEM', mem: { id: uid(), text: summary.trim() } })
-        dispatch({ type: 'SET_FIELD', field: 'sumUpTo', value: state.story.length - KR })
+        pendingSumRange.current = [from, to]
+
+        if (autoTriggered && state.autoAccept) {
+          // Auto-accept: add directly
+          dispatch({
+            type: 'ADD_SUMMARY',
+            summary: { id: uid(), text: summary.trim(), tier: 'recent', charRange: [from, to], createdAt: Date.now() },
+          })
+          dispatch({ type: 'SET_FIELD', field: 'sumUpTo', value: to })
+        } else {
+          // Show preview for user to review
+          dispatch({ type: 'SET_SUM_PREVIEW', text: summary.trim() })
+        }
       }
     } catch (e) {
       dispatch({ type: 'SET_ERR', err: 'Summarization failed: ' + (e instanceof Error ? e.message : '') })
     }
     dispatch({ type: 'SET_SUMMING', summing: false })
-  }, [state.story, state.sumUpTo, state.summing])
+  }, [state.story, state.sumUpTo, state.summing, state.autoAccept, state.sumThreshold])
+
+  const confirmSummary = useCallback((editedText: string) => {
+    const [from, to] = pendingSumRange.current
+    dispatch({
+      type: 'ADD_SUMMARY',
+      summary: { id: uid(), text: editedText, tier: 'recent', charRange: [from, to], createdAt: Date.now() },
+    })
+    dispatch({ type: 'SET_FIELD', field: 'sumUpTo', value: to })
+    dispatch({ type: 'SET_SUM_PREVIEW', text: null })
+  }, [])
+
+  const dismissSummary = useCallback(() => {
+    dispatch({ type: 'SET_SUM_PREVIEW', text: null })
+  }, [])
 
   const doUpdateStats = useCallback(async () => {
     if (!state.secs.length || state.stUp) return
@@ -274,14 +341,22 @@ export function useGameState() {
     dispatch({ type: 'SET_STUP', stUp: false })
   }, [state.secs, state.story, state.stUp])
 
-  // Keep ref in sync and trigger deferred stats update
+  // Keep refs in sync and trigger deferred updates
   doUpdateStatsRef.current = doUpdateStats
+  doSummarizeRef.current = doSummarize
   useEffect(() => {
     if (!state.gen && pendingStatsUpdate && state.secs.length > 0) {
       setPendingStatsUpdate(false)
       doUpdateStatsRef.current()
     }
   }, [state.gen, pendingStatsUpdate, state.secs.length])
+
+  useEffect(() => {
+    if (!state.gen && pendingSummarize) {
+      setPendingSummarize(false)
+      doSummarizeRef.current(true)
+    }
+  }, [state.gen, pendingSummarize])
 
   const newAdventure = useCallback(async () => {
     try {
@@ -328,8 +403,9 @@ export function useGameState() {
 
   // Computed values
   const wt = wordCount(state.story)
-  const KR = 2000
-  const canSummarize = state.story.length > state.sumUpTo + KR + 500
+  const threshold = state.sumThreshold || 2500
+  const KR = Math.floor(threshold * 0.8)
+  const canSummarize = state.story.length > state.sumUpTo + threshold
   const textToSummarize = canSummarize ? state.story.slice(state.sumUpTo, state.story.length - KR) : ''
   const summarizeWordCount = wordCount(textToSummarize)
 
@@ -345,6 +421,8 @@ export function useGameState() {
       deleteLast,
       stop,
       doSummarize,
+      confirmSummary,
+      dismissSummary,
       doUpdateStats,
       newAdventure,
       saveFile,

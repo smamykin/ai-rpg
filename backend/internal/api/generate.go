@@ -16,7 +16,8 @@ type GenerateRequest struct {
 }
 
 type SummarizeRequest struct {
-	Text string `json:"text"` // text to summarize
+	Text      string `json:"text"`      // text to summarize
+	Condensed bool   `json:"condensed"` // true = condense multiple summaries into one
 }
 
 type UpdateStatsRequest struct {
@@ -137,11 +138,18 @@ func (h *Handlers) Summarize(w http.ResponseWriter, r *http.Request) {
 	}
 	model := h.resolveSupportModel(state)
 
+	systemPrompt := "You are a precise story summarizer."
+	userPrompt := "Summarize (1/3 length). Preserve key facts. Past tense. ONLY the summary.\n\n" + req.Text
+	if req.Condensed {
+		systemPrompt = "You are a precise story summarizer. Condense multiple summaries into one cohesive overview."
+		userPrompt = "Condense these summaries into a single cohesive summary (1/3 length). Preserve only the most important facts, characters, and events. Past tense. ONLY the summary.\n\n" + req.Text
+	}
+
 	summary, err := h.client.Complete(
 		r.Context(),
 		model,
-		"You are a precise story summarizer.",
-		"Summarize (1/3 length). Preserve key facts. Past tense. ONLY the summary.\n\n"+req.Text,
+		systemPrompt,
+		userPrompt,
 		1000,
 	)
 	if err != nil {

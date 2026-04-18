@@ -21,11 +21,15 @@ interface Props {
     gen: boolean
     streaming: string
     err: string
-    mems: GameState['mems']
-    addlMem: string
+    summaries: GameState['summaries']
+    lore: GameState['lore']
+    autoSum: boolean
+    autoAccept: boolean
+    sumThreshold: number
     secs: GameState['secs']
     auFreq: number
     summing: boolean
+    sumPreview: string | null
     stUp: boolean
   }
   dispatch: React.Dispatch<any>
@@ -36,7 +40,9 @@ interface Props {
     regen: () => void
     deleteLast: () => void
     stop: () => void
-    doSummarize: () => void
+    doSummarize: (autoTriggered?: boolean) => void
+    confirmSummary: (text: string) => void
+    dismissSummary: () => void
     doUpdateStats: () => void
     newAdventure: () => void
     saveFile: () => void
@@ -59,6 +65,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [showArc, setShowArc] = useState(false)
   const [cfm, setCfm] = useState(false)
 
+  const memCount = state.summaries.length + state.lore.length
+
   return (
     <div className="R">
       {/* Header */}
@@ -66,7 +74,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         <h1>{state.overview?.slice(0, 24) || 'AI RPG'}{state.overview && state.overview.length > 24 ? '\u2026' : ''}</h1>
         <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
           <button className="b bs" onClick={() => setShowMem(s => !s)}>
-            Memory{state.mems.length > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{state.mems.length}</span>}
+            Memory{memCount > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{memCount}</span>}
           </button>
           <button className="b bs" onClick={() => setShowSt(s => !s)}>
             Track{state.secs.length > 0 && <span style={{ fontSize: '.65rem', marginLeft: 1 }}>{state.secs.length}</span>}
@@ -103,13 +111,20 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
       <MemoryPanel
         show={showMem} onClose={() => setShowMem(false)}
-        mems={state.mems} addlMem={state.addlMem}
+        summaries={state.summaries}
+        lore={state.lore}
+        autoSum={state.autoSum}
+        autoAccept={state.autoAccept}
+        sumThreshold={state.sumThreshold}
+        sumPreview={state.sumPreview}
         wordCount={computed.wordCount}
         canSummarize={computed.canSummarize}
         summarizeWordCount={computed.summarizeWordCount}
         summing={state.summing}
         dispatch={dispatch} setField={setField}
-        onSummarize={actions.doSummarize}
+        onSummarize={() => actions.doSummarize(false)}
+        onConfirmSummary={actions.confirmSummary}
+        onDismissSummary={actions.dismissSummary}
       />
 
       <TrackingPanel
@@ -148,7 +163,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       {state.story.trim() && !state.gen && !state.stUp && (
         <div className="ib">
           <span>{computed.wordCount.toLocaleString()}w</span>
-          {state.mems.length > 0 && <span className="bd" style={{ background: 'var(--ac2)', color: '#fff' }}>Mem {state.mems.length}</span>}
+          {state.summaries.length > 0 && <span className="bd" style={{ background: 'var(--ac2)', color: '#fff' }}>Sum {state.summaries.length}</span>}
+          {state.lore.filter(l => l.enabled).length > 0 && <span className="bd" style={{ background: 'var(--ac)', color: '#fff' }}>Lore {state.lore.filter(l => l.enabled).length}</span>}
           {state.secs.length > 0 && state.auFreq > 0 && <span className="bd" style={{ background: 'var(--bd)', color: 'var(--tx)' }}>auto:{state.auFreq}</span>}
         </div>
       )}

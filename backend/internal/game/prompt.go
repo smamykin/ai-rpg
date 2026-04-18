@@ -27,24 +27,48 @@ Rules:
 func BuildPrompt(state *GameState, task, action string) string {
 	var b strings.Builder
 
-	// Summary entries
-	filtered := make([]Memory, 0)
-	for _, m := range state.Mems {
-		if strings.TrimSpace(m.Text) != "" {
-			filtered = append(filtered, m)
+	// Ancient-tier summaries (condensed deep history)
+	var ancients []Summary
+	for _, s := range state.Summaries {
+		if s.Tier == "ancient" && strings.TrimSpace(s.Text) != "" {
+			ancients = append(ancients, s)
 		}
 	}
-	if len(filtered) > 0 {
-		b.WriteString("# Summary of Earlier Events:\n")
-		for _, m := range filtered {
-			b.WriteString(strings.TrimSpace(m.Text))
+	if len(ancients) > 0 {
+		b.WriteString("# Deep History (condensed):\n")
+		for _, s := range ancients {
+			b.WriteString(strings.TrimSpace(s.Text))
 			b.WriteString("\n\n")
 		}
 	}
 
-	// Additional memory
-	if strings.TrimSpace(state.AddlMem) != "" {
-		fmt.Fprintf(&b, "# Additional Context:\n%s\n\n", strings.TrimSpace(state.AddlMem))
+	// Recent-tier summaries
+	var recents []Summary
+	for _, s := range state.Summaries {
+		if s.Tier == "recent" && strings.TrimSpace(s.Text) != "" {
+			recents = append(recents, s)
+		}
+	}
+	if len(recents) > 0 {
+		b.WriteString("# Summary of Earlier Events:\n")
+		for _, s := range recents {
+			b.WriteString(strings.TrimSpace(s.Text))
+			b.WriteString("\n\n")
+		}
+	}
+
+	// Lore entries (only enabled)
+	var enabledLore []LoreEntry
+	for _, l := range state.Lore {
+		if l.Enabled && strings.TrimSpace(l.Text) != "" {
+			enabledLore = append(enabledLore, l)
+		}
+	}
+	if len(enabledLore) > 0 {
+		b.WriteString("# World & Character Lore:\n")
+		for _, l := range enabledLore {
+			fmt.Fprintf(&b, "**%s**: %s\n\n", l.Name, strings.TrimSpace(l.Text))
+		}
 	}
 
 	// Overview
@@ -52,9 +76,13 @@ func BuildPrompt(state *GameState, task, action string) string {
 		fmt.Fprintf(&b, "# Adventure Overview:\n%s\n\n", state.Overview)
 	}
 
-	// Story so far
-	if strings.TrimSpace(state.Story) != "" {
-		fmt.Fprintf(&b, "# Story So Far (player actions prefixed with \">\"):\n%s\n\n", strings.TrimSpace(state.Story))
+	// Story so far (only unsummarized portion)
+	story := state.Story
+	if state.SumUpTo > 0 && state.SumUpTo < len(story) {
+		story = story[state.SumUpTo:]
+	}
+	if strings.TrimSpace(story) != "" {
+		fmt.Fprintf(&b, "# Story So Far (player actions prefixed with \">\"):\n%s\n\n", strings.TrimSpace(story))
 	}
 
 	// Game state sections

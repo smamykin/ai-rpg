@@ -49,10 +49,10 @@ export async function getModels(): Promise<ModelInfo[]> {
   return res.models
 }
 
-export async function summarize(text: string): Promise<string> {
+export async function summarize(text: string, condensed = false): Promise<string> {
   const res = await fetchJSON<{ summary: string }>('/summarize', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, condensed }),
   })
   return res.summary
 }

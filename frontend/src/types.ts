@@ -1,7 +1,20 @@
-export interface Memory {
+export interface Summary {
   id: string
   text: string
+  tier: 'recent' | 'ancient'
+  charRange: [number, number]
+  createdAt: number
 }
+
+export interface LoreEntry {
+  id: string
+  name: string
+  text: string
+  tag: string
+  enabled: boolean
+}
+
+export const LORE_TAGS = ['world', 'character', 'rule', 'quest', 'other'] as const
 
 export interface Section {
   id: string
@@ -19,12 +32,19 @@ export interface GameState {
   supportModel: string
   arc: string
   diff: string
-  mems: Memory[]
-  addlMem: string
+  summaries: Summary[]
+  lore: LoreEntry[]
   sumUpTo: number
+  autoSum: boolean
+  autoAccept: boolean
+  sumThreshold: number
   secs: Section[]
   auFreq: number
   format?: string
+
+  // Legacy fields — present only in old saves before migration
+  mems?: { id: string; text: string }[]
+  addlMem?: string
 }
 
 export interface ModelInfo {
@@ -54,9 +74,12 @@ export function defaultState(): GameState {
     supportModel: '',
     arc: '',
     diff: 'normal',
-    mems: [],
-    addlMem: '',
+    summaries: [],
+    lore: [],
     sumUpTo: 0,
+    autoSum: false,
+    autoAccept: false,
+    sumThreshold: 2500,
     secs: [],
     auFreq: 0,
   }
