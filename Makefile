@@ -64,4 +64,4 @@ prod-logs:
 
 ## Deploy to VPS (usage: make deploy host=user@yourserver.com)
 deploy:
-	ssh $(host) 'cd ~/ai-rpg-v2 && git pull && docker compose -f docker-compose.prod.yml up -d --build'
+	ssh $(host) 'cd /srv/ai-rpg-v2/ai-rpg-v2 && git pull && docker compose -f docker-compose.prod.yml up -d --build'
