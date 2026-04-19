@@ -373,8 +373,10 @@ export function useGameState() {
 
   const cont = useCallback(() => {
     if (state.gen || state.summing || !isViewingActive) return
-    generate('continue')
-  }, [generate, state.gen, state.summing, isViewingActive])
+    const active = getActiveChapter(state)
+    const isFirstChunk = !active || !active.content.trim()
+    generate(isFirstChunk ? 'open' : 'continue')
+  }, [generate, state, isViewingActive])
 
   const regen = useCallback(() => {
     if (state.gen || state.summing || !isViewingActive) return

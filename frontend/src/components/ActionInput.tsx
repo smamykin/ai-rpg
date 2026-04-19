@@ -67,7 +67,7 @@ export default function ActionInput({
             value={action}
             onChange={e => setAction(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={story.length > 500 ? 'What do you do? (Tab = continue)' : 'What do you do next?'}
+            placeholder={!story.trim() ? 'Describe your first action, or press Begin' : story.length > 500 ? 'What do you do? (Tab = continue)' : 'What do you do next?'}
             disabled={blocked}
             rows={1}
             onInput={handleInput}
@@ -76,8 +76,10 @@ export default function ActionInput({
             <button className="b bs" onClick={onStop} style={{ color: 'var(--dng)', minHeight: 40 }}>&#x23f9;</button>
           ) : action.trim() ? (
             <button className="b ba" onClick={handleSubmit} disabled={blocked} style={{ minHeight: 40 }}>&#x25b6;</button>
+          ) : !story.trim() ? (
+            <button className="b ba" onClick={onContinue} disabled={blocked} style={{ minHeight: 40, padding: '0 .9rem' }}>Begin</button>
           ) : (
-            <button className="b" onClick={onContinue} disabled={blocked || !story.trim()} style={{ minHeight: 40 }}>&#x23ed;</button>
+            <button className="b" onClick={onContinue} disabled={blocked} style={{ minHeight: 40 }}>&#x23ed;</button>
           )}
         </div>
         <div className="ct">
