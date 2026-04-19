@@ -106,7 +106,7 @@ func metaFromState(st *game.GameState) SessionMeta {
 		CreatedAt:    st.CreatedAt,
 		LastPlayedAt: st.LastPlayedAt,
 		OverviewHead: head,
-		StoryChars:   len(st.Story),
+		StoryChars:   st.TotalContentChars(),
 	}
 }
 

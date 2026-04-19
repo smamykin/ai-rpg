@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { LoreEntry, Summary, GalleryImage } from '../types'
+import type { LoreEntry, GalleryImage } from '../types'
 import { uid, LORE_TAGS } from '../types'
 import * as api from '../api'
 import Lightbox from './Lightbox'
@@ -16,7 +16,7 @@ const TAG_COLORS: Record<string, string> = {
 export interface LoreEditorAIContext {
   story?: string
   overview?: string
-  summaries?: Summary[]
+  summaries?: string // joined summaries text (from chapters)
 }
 
 interface Props {
@@ -121,7 +121,7 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
   const img = getLoreImage(selected.id)
   const story = aiContext?.story ?? ''
   const overview = aiContext?.overview ?? ''
-  const summaries = aiContext?.summaries ?? []
+  const summaries = aiContext?.summaries ?? ''
 
   return (
     <>
@@ -230,7 +230,7 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
                     setAiGenerating(true); setAiError('')
                     const ctx: Parameters<typeof api.generateLore>[3] = {}
                     if (aiCtxStory && story) ctx.recentStory = story.slice(-4000)
-                    if (aiCtxSummaries && summaries.length > 0) ctx.summaries = summaries.map(s => s.text).join('\n\n')
+                    if (aiCtxSummaries && summaries) ctx.summaries = summaries
                     if (aiCtxLore) {
                       const others = lore.filter(l => l.enabled && l.id !== selected.id && l.text.trim())
                       if (others.length > 0) ctx.loreEntries = others.map(l => ({ name: l.name, text: l.text }))

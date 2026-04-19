@@ -1,23 +1,23 @@
 package game
 
 import (
-	"strings"
+	"fmt"
+	"log"
 	"time"
 )
 
-const FormatV2 = "ai-rpg-nano-v2"
-const FormatV3 = "ai-rpg-nano-v3"
+const FormatV5 = "ai-rpg-nano-v5" // chapters model
 
 // GameState holds the full game state.
 type GameState struct {
-	// Session metadata (v3+)
+	// Session metadata
 	SessionID    string            `json:"sessionId,omitempty"`
 	Name         string            `json:"name,omitempty"`
 	CreatedAt    int64             `json:"createdAt,omitempty"`
 	LastPlayedAt int64             `json:"lastPlayedAt,omitempty"`
 	ModelRoles   map[string]string `json:"modelRoles,omitempty"`
 
-	Story        string      `json:"story"`
+	// Setup & config (carried across format upgrades)
 	Overview     string      `json:"overview"`
 	Style        string      `json:"style"`
 	CStyle       string      `json:"cStyle"`
@@ -25,20 +25,21 @@ type GameState struct {
 	SupportModel string      `json:"supportModel"`
 	Arc          string      `json:"arc"`
 	Diff         string      `json:"diff"`
-	Summaries    []Summary   `json:"summaries"`
 	Lore         []LoreEntry `json:"lore"`
-	SumUpTo      int         `json:"sumUpTo"`
-	AutoSum      bool        `json:"autoSum"`
-	AutoAccept   bool        `json:"autoAccept"`
-	SumThreshold int         `json:"sumThreshold"`
 	Secs         []Section   `json:"secs"`
 	AuFreq       int         `json:"auFreq"`
 	TTS          TTSSettings `json:"tts"`
-	Format       string      `json:"format,omitempty"`
 
-	// Legacy fields — consumed during migration, omitted after.
-	Mems    []Memory `json:"mems,omitempty"`
-	AddlMem string   `json:"addlMem,omitempty"`
+	// Chapters (v5)
+	Chapters         []Chapter `json:"chapters"`
+	ActiveChapterID  string    `json:"activeChapterId,omitempty"`
+	ViewingChapterID string    `json:"viewingChapterId,omitempty"`
+	ArchivedChapters []Chapter `json:"archivedChapters,omitempty"`
+
+	// Context budget (v5)
+	EffectiveCtxTokens int `json:"effectiveCtxTokens,omitempty"`
+
+	Format string `json:"format,omitempty"`
 }
 
 type TTSSettings struct {
@@ -54,12 +55,17 @@ type TTSModelSettings struct {
 	DialogueVoice string  `json:"dialogueVoice,omitempty"`
 }
 
-type Summary struct {
-	ID        string `json:"id"`
-	Text      string `json:"text"`
-	Tier      string `json:"tier"`      // "recent" or "ancient"
-	CharRange [2]int `json:"charRange"` // [fromChar, toChar] of story text summarized
-	CreatedAt int64  `json:"createdAt"`
+// Chapter represents a single narrative unit — either a leaf chapter with content,
+// or an act grouping multiple closed chapters under one condensed summary.
+type Chapter struct {
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Content      string   `json:"content"`            // empty for acts
+	Summary      string   `json:"summary"`            // empty while active
+	Status       string   `json:"status"`             // "active" | "closed" | "act"
+	Children     []string `json:"children,omitempty"` // chapter IDs — only on acts
+	SummaryStale bool     `json:"summaryStale,omitempty"`
+	CreatedAt    int64    `json:"createdAt"`
 }
 
 type LoreEntry struct {
@@ -70,12 +76,6 @@ type LoreEntry struct {
 	Enabled bool   `json:"enabled"`
 }
 
-// Legacy type kept for migration deserialization.
-type Memory struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-}
-
 type Section struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -84,7 +84,6 @@ type Section struct {
 }
 
 // Scenario is a reusable session template (overview + style + lore + sections).
-// Fields mirror the subset of GameState that makes sense to carry into a fresh session.
 type Scenario struct {
 	ID          string      `json:"id"`
 	Name        string      `json:"name"`
@@ -99,96 +98,123 @@ type Scenario struct {
 	UpdatedAt   int64       `json:"updatedAt"`
 }
 
-// Migrate converts legacy fields to the new format. Returns true if changes were made.
+// Migrate brings state to the current format. For pre-v5 states, it wipes any play
+// progress (story, summaries) while preserving session metadata and setup (lore,
+// overview, sections, TTS). Returns true if the state was mutated.
+//
+// TODO: remove the pre-v5 wipe branch once no users are on older formats (after 2026-06).
 func (s *GameState) Migrate() bool {
 	changed := false
 
-	// Migrate old mems[] -> summaries[]
-	if len(s.Mems) > 0 && len(s.Summaries) == 0 {
-		for _, m := range s.Mems {
-			if strings.TrimSpace(m.Text) == "" {
-				continue
-			}
-			s.Summaries = append(s.Summaries, Summary{
-				ID:        m.ID,
-				Text:      m.Text,
-				Tier:      "recent",
-				CharRange: [2]int{0, 0},
-			})
+	if s.Format != FormatV5 {
+		// Legacy formats carried arbitrary play-progress fields we've since removed.
+		// encoding/json has already silently dropped them during Unmarshal; here we
+		// just reset the chapters structure so the session starts clean.
+		s.Chapters = nil
+		s.ActiveChapterID = ""
+		s.ViewingChapterID = ""
+		s.ArchivedChapters = nil
+		if s.Format != "" {
+			log.Printf("migrated session %q from format %q to %q (play progress wiped, setup preserved)", s.SessionID, s.Format, FormatV5)
 		}
-		s.Mems = nil
+		s.Format = FormatV5
 		changed = true
 	}
 
-	// Migrate addlMem blob -> single lore entry
-	if strings.TrimSpace(s.AddlMem) != "" && len(s.Lore) == 0 {
-		s.Lore = append(s.Lore, LoreEntry{
-			ID:      "migrated_addlmem",
-			Name:    "Notes",
-			Text:    s.AddlMem,
-			Tag:     "world",
-			Enabled: true,
-		})
-		s.AddlMem = ""
-		changed = true
-	}
-
-	// Ensure slices are non-nil
-	if s.Summaries == nil {
-		s.Summaries = []Summary{}
+	// Invariants
+	if s.Chapters == nil {
+		s.Chapters = []Chapter{}
 		changed = true
 	}
 	if s.Lore == nil {
 		s.Lore = []LoreEntry{}
 		changed = true
 	}
-
-	// v2 bump
-	if s.Format == "" {
-		s.Format = FormatV2
+	if s.Secs == nil {
+		s.Secs = []Section{}
 		changed = true
 	}
-
-	// v3: session metadata fields
-	if s.Format != FormatV3 {
-		if s.ModelRoles == nil {
-			s.ModelRoles = map[string]string{}
-		}
-		if s.Name == "" {
-			s.Name = "Adventure"
-		}
-		now := time.Now().Unix()
-		if s.CreatedAt == 0 {
-			s.CreatedAt = now
-		}
-		if s.LastPlayedAt == 0 {
-			s.LastPlayedAt = now
-		}
-		s.Format = FormatV3
-		changed = true
-	}
-
 	if s.ModelRoles == nil {
 		s.ModelRoles = map[string]string{}
+		changed = true
+	}
+	if s.Name == "" {
+		s.Name = "Adventure"
+		changed = true
+	}
+	if s.EffectiveCtxTokens == 0 {
+		s.EffectiveCtxTokens = 32000
+		changed = true
+	}
+	if s.ensureActiveChapter() {
+		changed = true
+	}
+	if s.ViewingChapterID == "" && s.ActiveChapterID != "" {
+		s.ViewingChapterID = s.ActiveChapterID
 		changed = true
 	}
 
 	return changed
 }
 
+// ensureActiveChapter guarantees exactly one chapter with status "active".
+// If none exists, appends a blank one and sets ActiveChapterID.
+func (s *GameState) ensureActiveChapter() bool {
+	for _, c := range s.Chapters {
+		if c.Status == "active" {
+			if s.ActiveChapterID != c.ID {
+				s.ActiveChapterID = c.ID
+				return true
+			}
+			return false
+		}
+	}
+	id := fmt.Sprintf("ch_%d", time.Now().UnixNano())
+	s.Chapters = append(s.Chapters, Chapter{
+		ID:        id,
+		Title:     "",
+		Status:    "active",
+		CreatedAt: time.Now().Unix(),
+	})
+	s.ActiveChapterID = id
+	return true
+}
+
+// ActiveChapter returns the active chapter, or nil if none (should not happen after Migrate).
+func (s *GameState) ActiveChapter() *Chapter {
+	for i := range s.Chapters {
+		if s.Chapters[i].ID == s.ActiveChapterID {
+			return &s.Chapters[i]
+		}
+	}
+	return nil
+}
+
+// TotalContentChars sums the content length across all chapters (for session metadata).
+func (s *GameState) TotalContentChars() int {
+	total := 0
+	for _, c := range s.Chapters {
+		total += len(c.Content)
+	}
+	return total
+}
+
 func DefaultState() *GameState {
 	now := time.Now().Unix()
-	return &GameState{
-		Name:         "Adventure",
-		CreatedAt:    now,
-		LastPlayedAt: now,
-		ModelRoles:   map[string]string{},
-		Style:        "1 paragraph",
-		Diff:         "normal",
-		Summaries:    []Summary{},
-		Lore:         []LoreEntry{},
-		SumThreshold: 2500,
-		Secs:         []Section{},
-		Format:       FormatV3,
+	s := &GameState{
+		Name:               "Adventure",
+		CreatedAt:          now,
+		LastPlayedAt:       now,
+		ModelRoles:         map[string]string{},
+		Style:              "1 paragraph",
+		Diff:               "normal",
+		Lore:               []LoreEntry{},
+		Secs:               []Section{},
+		Chapters:           []Chapter{},
+		EffectiveCtxTokens: 32000,
+		Format:             FormatV5,
 	}
+	s.ensureActiveChapter()
+	s.ViewingChapterID = s.ActiveChapterID
+	return s
 }

@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, Summary, LoreEntry, Section, Phase, TTSModelSettings } from '../types'
-import { defaultState, uid, wordCount } from '../types'
+import type { Chapter, GameState, LoreEntry, Section, Phase, TTSModelSettings } from '../types'
+import { defaultState, getActiveChapter, getViewingChapter, newChapterId, wordCount } from '../types'
 import * as api from '../api'
 
 interface State extends GameState {
@@ -11,7 +11,6 @@ interface State extends GameState {
   summing: boolean
   stUp: boolean
   loaded: boolean
-  sumPreview: string | null
   genStage: 'thinking' | 'writing' | 'stats' | 'summarizing' | null
   saveStatus: 'idle' | 'saving' | 'saved'
   lastNarrationId: number
@@ -26,17 +25,18 @@ type Action =
   | { type: 'SET_ERR'; err: string }
   | { type: 'SET_SUMMING'; summing: boolean }
   | { type: 'SET_STUP'; stUp: boolean }
-  | { type: 'SET_STORY'; story: string }
-  | { type: 'ADD_SUMMARY'; summary: Summary }
-  | { type: 'UPDATE_SUMMARY'; id: string; text: string }
-  | { type: 'REMOVE_SUMMARY'; id: string }
-  | { type: 'SET_SUMMARIES'; summaries: Summary[] }
+  | { type: 'UPDATE_CHAPTER'; id: string; patch: Partial<Chapter> }
+  | { type: 'SET_CHAPTERS'; chapters: Chapter[] }
+  | { type: 'ADD_CHAPTER'; chapter: Chapter }
+  | { type: 'REMOVE_CHAPTER'; id: string }
+  | { type: 'SET_ACTIVE_CHAPTER'; id: string }
+  | { type: 'SET_VIEWING_CHAPTER'; id: string }
+  | { type: 'SET_ARCHIVED'; archived: Chapter[] }
   | { type: 'ADD_LORE'; entry: LoreEntry }
   | { type: 'UPDATE_LORE'; id: string; updates: Partial<LoreEntry> }
   | { type: 'REMOVE_LORE'; id: string }
   | { type: 'TOGGLE_LORE'; id: string }
   | { type: 'SET_LORE'; lore: LoreEntry[] }
-  | { type: 'SET_SUM_PREVIEW'; text: string | null }
   | { type: 'ADD_SEC'; sec: Section }
   | { type: 'UPDATE_SEC'; id: string; content: string }
   | { type: 'REMOVE_SEC'; id: string }
@@ -68,18 +68,25 @@ function reducer(state: State, action: Action): State {
       return { ...state, summing: action.summing }
     case 'SET_STUP':
       return { ...state, stUp: action.stUp }
-    case 'SET_STORY':
-      return { ...state, story: action.story }
 
-    // Summaries
-    case 'ADD_SUMMARY':
-      return { ...state, summaries: [...state.summaries, action.summary] }
-    case 'UPDATE_SUMMARY':
-      return { ...state, summaries: state.summaries.map(s => s.id === action.id ? { ...s, text: action.text } : s) }
-    case 'REMOVE_SUMMARY':
-      return { ...state, summaries: state.summaries.filter(s => s.id !== action.id) }
-    case 'SET_SUMMARIES':
-      return { ...state, summaries: action.summaries }
+    // Chapters
+    case 'UPDATE_CHAPTER':
+      return {
+        ...state,
+        chapters: state.chapters.map(c => c.id === action.id ? { ...c, ...action.patch } : c),
+      }
+    case 'SET_CHAPTERS':
+      return { ...state, chapters: action.chapters }
+    case 'ADD_CHAPTER':
+      return { ...state, chapters: [...state.chapters, action.chapter] }
+    case 'REMOVE_CHAPTER':
+      return { ...state, chapters: state.chapters.filter(c => c.id !== action.id) }
+    case 'SET_ACTIVE_CHAPTER':
+      return { ...state, activeChapterId: action.id }
+    case 'SET_VIEWING_CHAPTER':
+      return { ...state, viewingChapterId: action.id }
+    case 'SET_ARCHIVED':
+      return { ...state, archivedChapters: action.archived }
 
     // Lore
     case 'ADD_LORE':
@@ -93,9 +100,6 @@ function reducer(state: State, action: Action): State {
     case 'SET_LORE':
       return { ...state, lore: action.lore }
 
-    case 'SET_SUM_PREVIEW':
-      return { ...state, sumPreview: action.text }
-
     case 'ADD_SEC':
       return { ...state, secs: [...state.secs, action.sec] }
     case 'UPDATE_SEC':
@@ -104,19 +108,23 @@ function reducer(state: State, action: Action): State {
       return { ...state, secs: state.secs.filter(s => s.id !== action.id) }
     case 'SET_SECS':
       return { ...state, secs: action.secs }
-    case 'LOAD_STATE':
+
+    case 'LOAD_STATE': {
+      const loaded = action.state
+      const active = loaded.chapters?.find(c => c.id === loaded.activeChapterId) || loaded.chapters?.find(c => c.status === 'active')
+      const hasPlayContent = !!(loaded.overview || (active && active.content))
       return {
         ...state,
-        ...action.state,
-        tts: action.state.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
-        phase: action.state.story ? 'playing' : 'setup',
+        ...loaded,
+        tts: loaded.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
+        phase: hasPlayContent ? 'playing' : 'setup',
         loaded: true,
-        sumPreview: null,
         gen: false,
         streaming: '',
         err: '',
         genStage: null,
       }
+    }
     case 'ENTER_HUB':
       return {
         ...state,
@@ -128,7 +136,6 @@ function reducer(state: State, action: Action): State {
         err: '',
         summing: false,
         stUp: false,
-        sumPreview: null,
         genStage: null,
         saveStatus: 'idle',
         lastNarrationId: 0,
@@ -144,7 +151,6 @@ function reducer(state: State, action: Action): State {
         summing: false,
         stUp: false,
         loaded: true,
-        sumPreview: null,
         genStage: null,
         saveStatus: 'idle',
         lastNarrationId: 0,
@@ -181,11 +187,31 @@ const initialState: State = {
   summing: false,
   stUp: false,
   loaded: false,
-  sumPreview: null,
   genStage: null,
   saveStatus: 'idle',
   lastNarrationId: 0,
   lastNarrationText: '',
+}
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
+function toRoman(n: number): string {
+  return ROMAN[n - 1] || String(n)
+}
+
+// Serializable slice of state that gets persisted.
+function toPersistable(s: State): Partial<GameState> {
+  const {
+    name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
+    lore, secs, auFreq, tts,
+    chapters, activeChapterId, viewingChapterId, archivedChapters,
+    effectiveCtxTokens,
+  } = s
+  return {
+    name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
+    lore, secs, auFreq, tts,
+    chapters, activeChapterId, viewingChapterId, archivedChapters,
+    effectiveCtxTokens,
+  }
 }
 
 export function useGameState() {
@@ -194,8 +220,8 @@ export function useGameState() {
   const beforeRef = useRef('')
   const genCountRef = useRef(0)
   const [pendingStatsUpdate, setPendingStatsUpdate] = useState(false)
-  const [pendingSummarize, setPendingSummarize] = useState(false)
-  const pendingSumRange = useRef<[number, number]>([0, 0])
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   // Load state from server on mount. 404 → no current session → hub.
   useEffect(() => {
@@ -214,13 +240,10 @@ export function useGameState() {
       })
   }, [])
 
-  // Keep the api module's current session id in sync so X-Session-Id is attached to mutating requests.
   useEffect(() => {
     api.setCurrentSessionId(state.sessionId || '')
   }, [state.sessionId])
 
-  // After LOAD_STATE / ENTER_HUB / SWITCH, skip the next auto-save tick to avoid echoing
-  // the freshly loaded state back to the server (which could also 409 if the session changed).
   const skipNextSave = useRef(false)
   const prevSessionRef = useRef(state.sessionId)
   useEffect(() => {
@@ -244,8 +267,7 @@ export function useGameState() {
     saveTimer.current = setTimeout(() => {
       dispatch({ type: 'SET_SAVE_STATUS', status: 'saving' })
       clearTimeout(savedResetTimer.current)
-      const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts } = state
-      api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts })
+      api.saveState(toPersistable(state))
         .then(() => {
           dispatch({ type: 'SET_SAVE_STATUS', status: 'saved' })
           savedResetTimer.current = setTimeout(() => dispatch({ type: 'SET_SAVE_STATUS', status: 'idle' }), 2000)
@@ -255,68 +277,77 @@ export function useGameState() {
         })
     }, 1000)
     return () => clearTimeout(saveTimer.current)
-  }, [state.name, state.story, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel, state.modelRoles, state.arc, state.diff, state.summaries, state.lore, state.sumUpTo, state.autoSum, state.autoAccept, state.sumThreshold, state.secs, state.auFreq, state.tts, state.loaded, state.phase, state.sessionId])
+  }, [
+    state.name, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel,
+    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.auFreq, state.tts,
+    state.chapters, state.activeChapterId, state.viewingChapterId, state.archivedChapters,
+    state.effectiveCtxTokens, state.loaded, state.phase, state.sessionId,
+  ])
 
-  // Trigger stats update after generation if needed (ref to avoid forward reference)
   const doUpdateStatsRef = useRef<() => void>(() => {})
-  const doSummarizeRef = useRef<(autoTriggered: boolean) => void>(() => {})
 
   const setField = useCallback(<K extends keyof GameState>(field: K, value: GameState[K]) => {
     dispatch({ type: 'SET_FIELD', field, value })
   }, [])
 
-  const generate = useCallback((task: string, action?: string, baseStory?: string) => {
+  // Check if the currently-viewed chapter is the active one. Generation actions require this.
+  const isViewingActive = state.viewingChapterId === state.activeChapterId
+
+  // Generate appends to the active chapter's content. Always operates on the active chapter,
+  // regardless of which chapter the user is viewing. UI should block calls when not viewing active.
+  const generate = useCallback((task: string, actionText?: string, baseContent?: string) => {
+    const cur = stateRef.current
+    const active = getActiveChapter(cur)
+    if (!active) return
+
     dispatch({ type: 'SET_GEN', gen: true })
     dispatch({ type: 'SET_GEN_STAGE', stage: 'thinking' })
     dispatch({ type: 'SET_ERR', err: '' })
     dispatch({ type: 'SET_STREAMING', text: '' })
 
-    const base = baseStory ?? state.story
+    const base = baseContent ?? active.content
     beforeRef.current = base
 
-    let currentStory = base
-    if (task === 'action' && action) {
-      currentStory = (base.trim() ? base.trim() + '\n\n' : '') + '> ' + action
-      dispatch({ type: 'SET_STORY', story: currentStory })
+    let currentContent = base
+    if (task === 'action' && actionText) {
+      currentContent = (base.trim() ? base.trim() + '\n\n' : '') + '> ' + actionText
+      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: currentContent } })
     }
 
     const ctrl = new AbortController()
     abortRef.current = ctrl
 
-    // Save state before generation so backend has latest story
-    const savePromise = api.saveState({
-      ...state,
-      story: currentStory,
-    }).catch(() => {})
+    // Save latest state so the backend sees the new action before generating.
+    const optimistic: State = {
+      ...cur,
+      chapters: cur.chapters.map(c => c.id === active.id ? { ...c, content: currentContent } : c),
+    }
+    const savePromise = api.saveState(toPersistable(optimistic)).catch(() => {})
 
     savePromise.then(() => {
-      api.generate(task, action || '', ctrl.signal, {
+      api.generate(task, actionText || '', ctrl.signal, {
         onChunk: (text) => {
           dispatch({ type: 'SET_GEN_STAGE', stage: 'writing' })
           dispatch({ type: 'SET_STREAMING', text })
-          dispatch({ type: 'SET_STORY', story: currentStory.trim() + '\n\n' + text })
+          dispatch({
+            type: 'UPDATE_CHAPTER',
+            id: active.id,
+            patch: { content: currentContent.trim() + '\n\n' + text },
+          })
         },
         onDone: (text) => {
-          const finalStory = currentStory.trim() + (text.trim() ? '\n\n' + text.trim() : '')
-          dispatch({ type: 'SET_STORY', story: finalStory })
+          const finalContent = currentContent.trim() + (text.trim() ? '\n\n' + text.trim() : '')
+          dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: finalContent } })
           dispatch({ type: 'SET_STREAMING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
           if (text.trim()) dispatch({ type: 'SET_LAST_NARRATION', text: text.trim() })
 
-          if (text.trim() && state.auFreq > 0 && state.secs.length > 0) {
+          if (text.trim() && cur.auFreq > 0 && cur.secs.length > 0) {
             genCountRef.current++
-            if (genCountRef.current >= state.auFreq) {
+            if (genCountRef.current >= cur.auFreq) {
               genCountRef.current = 0
               setPendingStatsUpdate(true)
-            }
-          }
-
-          // Auto-summarization check
-          if (text.trim() && state.autoSum) {
-            const threshold = state.sumThreshold || 2500
-            if (finalStory.length > state.sumUpTo + threshold) {
-              setPendingSummarize(true)
             }
           }
         },
@@ -328,7 +359,7 @@ export function useGameState() {
         },
       })
     })
-  }, [state])
+  }, [])
 
   const start = useCallback(() => {
     dispatch({ type: 'SET_PHASE', phase: 'playing' })
@@ -336,40 +367,45 @@ export function useGameState() {
   }, [generate])
 
   const submit = useCallback((action: string) => {
-    if (!action.trim() || state.gen) return
+    if (!action.trim() || state.gen || state.summing || !isViewingActive) return
     generate('action', action.trim())
-  }, [generate, state.gen])
+  }, [generate, state.gen, state.summing, isViewingActive])
 
   const cont = useCallback(() => {
-    if (!state.gen) generate('continue')
-  }, [generate, state.gen])
+    if (state.gen || state.summing || !isViewingActive) return
+    generate('continue')
+  }, [generate, state.gen, state.summing, isViewingActive])
 
   const regen = useCallback(() => {
-    if (state.gen || !state.story.trim()) return
+    if (state.gen || state.summing || !isViewingActive) return
+    const active = getActiveChapter(state)
+    if (!active) return
     const base = beforeRef.current
     const chunks = (base || '').trim().split(/\n\n/)
     const last = chunks[chunks.length - 1] || ''
 
     if (last.startsWith('> ')) {
-      dispatch({ type: 'SET_STORY', story: base })
+      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
       generate('action', last.replace(/^> /, ''), chunks.slice(0, -1).join('\n\n'))
     } else if (!base) {
-      dispatch({ type: 'SET_STORY', story: '' })
+      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: '' } })
       generate('open')
     } else {
-      dispatch({ type: 'SET_STORY', story: base })
+      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
       generate('continue', undefined, base)
     }
-  }, [generate, state.gen, state.story])
+  }, [generate, state, isViewingActive])
 
   const deleteLast = useCallback(() => {
-    if (state.gen) return
-    const chunks = state.story.trim().split(/\n\n/)
+    if (state.gen || state.summing || !isViewingActive) return
+    const active = getActiveChapter(state)
+    if (!active) return
+    const chunks = active.content.trim().split(/\n\n/)
     if (!chunks.length) return
     chunks.pop()
     if (chunks.length && chunks[chunks.length - 1].startsWith('> ')) chunks.pop()
-    dispatch({ type: 'SET_STORY', story: chunks.join('\n\n') })
-  }, [state.gen, state.story])
+    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: chunks.join('\n\n') } })
+  }, [state, isViewingActive])
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
@@ -381,76 +417,253 @@ export function useGameState() {
     }, 500)
   }, [])
 
-  const doSummarize = useCallback(async (autoTriggered = false) => {
-    const threshold = state.sumThreshold || 2500
-    const KR = Math.floor(threshold * 0.8)
-    const canS = state.story.length > state.sumUpTo + threshold
-    if (!canS || state.summing) return
+  // --- Chapter-level actions ---
 
-    const from = state.sumUpTo
-    const to = state.story.length - KR
-    const textToSum = state.story.slice(from, to)
+  const openChapter = useCallback((id: string) => {
+    dispatch({ type: 'SET_VIEWING_CHAPTER', id })
+  }, [])
+
+  const returnToActive = useCallback(() => {
+    dispatch({ type: 'SET_VIEWING_CHAPTER', id: stateRef.current.activeChapterId })
+  }, [])
+
+  const editChapter = useCallback((id: string, patch: Partial<Chapter>) => {
+    const cur = stateRef.current
+    const ch = cur.chapters.find(c => c.id === id)
+    if (!ch) return
+    // If content or summary changes on a closed/act chapter, mark summary stale.
+    const isStructural = (patch.content !== undefined && patch.content !== ch.content) ||
+                         (patch.summary !== undefined && patch.summary !== ch.summary)
+    const needsStale = isStructural && (ch.status === 'closed' || ch.status === 'act') && patch.summaryStale === undefined
+    const finalPatch: Partial<Chapter> = needsStale && patch.content !== undefined
+      ? { ...patch, summaryStale: true }
+      : patch
+    dispatch({ type: 'UPDATE_CHAPTER', id, patch: finalPatch })
+  }, [])
+
+  const resummarizeChapter = useCallback(async (id: string) => {
+    const cur = stateRef.current
+    const ch = cur.chapters.find(c => c.id === id)
+    if (!ch || ch.status === 'active') return
     dispatch({ type: 'SET_SUMMING', summing: true })
     dispatch({ type: 'SET_GEN_STAGE', stage: 'summarizing' })
-    dispatch({ type: 'SET_ERR', err: '' })
-
     try {
-      const summary = await api.summarize(textToSum)
-      if (summary.trim()) {
-        pendingSumRange.current = [from, to]
-
-        if (autoTriggered && state.autoAccept) {
-          // Auto-accept: add directly
-          dispatch({
-            type: 'ADD_SUMMARY',
-            summary: { id: uid(), text: summary.trim(), tier: 'recent', charRange: [from, to], createdAt: Date.now() },
-          })
-          dispatch({ type: 'SET_FIELD', field: 'sumUpTo', value: to })
-        } else {
-          // Show preview for user to review
-          dispatch({ type: 'SET_SUM_PREVIEW', text: summary.trim() })
-        }
+      let summaryText = ''
+      if (ch.status === 'act' && ch.children?.length) {
+        const childSummaries = ch.children
+          .map(cid => cur.chapters.find(c => c.id === cid)?.summary || '')
+          .filter(Boolean)
+          .join('\n\n---\n\n')
+        summaryText = await api.summarize(childSummaries, true)
+      } else {
+        summaryText = await api.summarize(ch.content)
+      }
+      const trimmed = summaryText.trim()
+      if (trimmed) {
+        dispatch({ type: 'UPDATE_CHAPTER', id, patch: { summary: trimmed, summaryStale: false } })
       }
     } catch (e) {
-      dispatch({ type: 'SET_ERR', err: 'Summarization failed: ' + (e instanceof Error ? e.message : '') })
+      dispatch({ type: 'SET_ERR', err: 'Summarize failed: ' + (e instanceof Error ? e.message : '') })
     }
     dispatch({ type: 'SET_GEN_STAGE', stage: null })
     dispatch({ type: 'SET_SUMMING', summing: false })
-  }, [state.story, state.sumUpTo, state.summing, state.autoAccept, state.sumThreshold])
-
-  const confirmSummary = useCallback((editedText: string) => {
-    const [from, to] = pendingSumRange.current
-    dispatch({
-      type: 'ADD_SUMMARY',
-      summary: { id: uid(), text: editedText, tier: 'recent', charRange: [from, to], createdAt: Date.now() },
-    })
-    dispatch({ type: 'SET_FIELD', field: 'sumUpTo', value: to })
-    dispatch({ type: 'SET_SUM_PREVIEW', text: null })
   }, [])
 
-  const dismissSummary = useCallback(() => {
-    dispatch({ type: 'SET_SUM_PREVIEW', text: null })
+  // Close the active chapter (summarize + title it), then create a new blank active chapter.
+  const endChapterAndStartNew = useCallback(async () => {
+    const cur = stateRef.current
+    const active = getActiveChapter(cur)
+    if (!active || !active.content.trim() || cur.gen || cur.summing) return
+
+    dispatch({ type: 'SET_SUMMING', summing: true })
+    dispatch({ type: 'SET_GEN_STAGE', stage: 'summarizing' })
+
+    try {
+      const [summaryText, titleText] = await Promise.all([
+        api.summarize(active.content),
+        api.suggestName('session', active.content.slice(0, 4000)).catch(() => ''),
+      ])
+      const summary = summaryText.trim()
+      let title = titleText.trim()
+      if (!title) {
+        const leafCount = cur.chapters.filter(c => c.status !== 'act').length
+        title = `Chapter ${leafCount}`
+      }
+
+      // Close the current active chapter.
+      dispatch({
+        type: 'UPDATE_CHAPTER',
+        id: active.id,
+        patch: { status: 'closed', summary, title: active.title || title, summaryStale: false },
+      })
+      // Create a new active chapter.
+      const newId = newChapterId()
+      const newCh: Chapter = {
+        id: newId,
+        title: '',
+        content: '',
+        summary: '',
+        status: 'active',
+        createdAt: Math.floor(Date.now() / 1000),
+      }
+      dispatch({ type: 'ADD_CHAPTER', chapter: newCh })
+      dispatch({ type: 'SET_ACTIVE_CHAPTER', id: newId })
+      dispatch({ type: 'SET_VIEWING_CHAPTER', id: newId })
+    } catch (e) {
+      dispatch({ type: 'SET_ERR', err: 'End-chapter failed: ' + (e instanceof Error ? e.message : '') })
+    }
+    dispatch({ type: 'SET_GEN_STAGE', stage: null })
+    dispatch({ type: 'SET_SUMMING', summing: false })
+  }, [])
+
+  // Rewind to a given closed chapter: make it active and archive (or delete) subsequent chapters.
+  // Refuses if the target is inside an act — caller should show a hint to un-act first.
+  const rewindToChapter = useCallback((id: string, mode: 'archive' | 'delete') => {
+    const cur = stateRef.current
+    const idx = cur.chapters.findIndex(c => c.id === id)
+    if (idx < 0) return
+    const target = cur.chapters[idx]
+    if (target.status === 'act') return
+    // Check if it's a child of any act.
+    const insideAct = cur.chapters.some(c => c.status === 'act' && c.children?.includes(id))
+    if (insideAct) {
+      dispatch({ type: 'SET_ERR', err: 'Un-act the surrounding group first to rewind into it.' })
+      return
+    }
+
+    const subsequent = cur.chapters.slice(idx + 1)
+    const kept = cur.chapters.slice(0, idx + 1).map(c =>
+      c.id === id ? { ...c, status: 'active' as const, summary: '' } : c,
+    )
+
+    dispatch({ type: 'SET_CHAPTERS', chapters: kept })
+    dispatch({ type: 'SET_ACTIVE_CHAPTER', id })
+    dispatch({ type: 'SET_VIEWING_CHAPTER', id })
+    if (mode === 'archive' && subsequent.length > 0) {
+      dispatch({ type: 'SET_ARCHIVED', archived: [...cur.archivedChapters, ...subsequent] })
+    }
+    // 'delete' mode: subsequent chapters are simply dropped (not added to archive).
+  }, [])
+
+  // Create an act from a set of closed chapters. The children stay in chapters[] (so they
+  // remain viewable/editable); the act references them by ID. In prompt/outline, children
+  // of an act are hidden from the flat list — only the act's summary represents them.
+  const createAct = useCallback(async (childIds: string[]) => {
+    const cur = stateRef.current
+    const ids = new Set(childIds)
+    const children = cur.chapters.filter(c => ids.has(c.id) && c.status === 'closed')
+    if (children.length === 0 || cur.summing) return
+
+    dispatch({ type: 'SET_SUMMING', summing: true })
+    dispatch({ type: 'SET_GEN_STAGE', stage: 'summarizing' })
+    try {
+      const joined = children.map(c => c.summary).filter(Boolean).join('\n\n---\n\n')
+      const condensed = await api.summarize(joined, true)
+      const trimmed = condensed.trim()
+      if (!trimmed) throw new Error('empty condensation')
+
+      const actId = newChapterId()
+      const actCount = cur.chapters.filter(c => c.status === 'act').length + 1
+      const act: Chapter = {
+        id: actId,
+        title: `Act ${toRoman(actCount)}`,
+        content: '',
+        summary: trimmed,
+        status: 'act',
+        children: children.map(c => c.id),
+        createdAt: Math.floor(Date.now() / 1000),
+      }
+
+      // Insert the act where the earliest child sits. Children stay in chapters[].
+      const earliestIdx = cur.chapters.findIndex(c => c.id === children[0].id)
+      const next = [...cur.chapters]
+      next.splice(earliestIdx, 0, act)
+      dispatch({ type: 'SET_CHAPTERS', chapters: next })
+    } catch (e) {
+      dispatch({ type: 'SET_ERR', err: 'Create act failed: ' + (e instanceof Error ? e.message : '') })
+    }
+    dispatch({ type: 'SET_GEN_STAGE', stage: null })
+    dispatch({ type: 'SET_SUMMING', summing: false })
+  }, [])
+
+  // Un-act: drop the act entry; its children remain in chapters[].
+  const unactAct = useCallback((actId: string) => {
+    dispatch({ type: 'REMOVE_CHAPTER', id: actId })
+  }, [])
+
+  const unarchiveChapter = useCallback((id: string) => {
+    const cur = stateRef.current
+    const ch = cur.archivedChapters.find(c => c.id === id)
+    if (!ch) return
+    const remaining = cur.archivedChapters.filter(c => c.id !== id)
+    dispatch({ type: 'SET_ARCHIVED', archived: remaining })
+    // Append after the active chapter (restored as closed).
+    const activeIdx = cur.chapters.findIndex(c => c.id === cur.activeChapterId)
+    const restored: Chapter = { ...ch, status: 'closed' }
+    const next = [...cur.chapters]
+    next.splice(activeIdx + 1, 0, restored)
+    dispatch({ type: 'SET_CHAPTERS', chapters: next })
+  }, [])
+
+  const deleteChapter = useCallback((id: string) => {
+    const cur = stateRef.current
+    const ch = cur.chapters.find(c => c.id === id)
+    if (!ch) return
+    // Can't delete the only active chapter — ensure another active exists first.
+    if (ch.status === 'active') {
+      // Promote the previous chapter to active, or create a blank one if none.
+      const idx = cur.chapters.findIndex(c => c.id === id)
+      const prior = cur.chapters.slice(0, idx).reverse().find(c => c.status === 'closed')
+      if (prior) {
+        dispatch({ type: 'UPDATE_CHAPTER', id: prior.id, patch: { status: 'active', summary: '' } })
+        dispatch({ type: 'SET_ACTIVE_CHAPTER', id: prior.id })
+        dispatch({ type: 'SET_VIEWING_CHAPTER', id: prior.id })
+      } else {
+        const newId = newChapterId()
+        dispatch({
+          type: 'ADD_CHAPTER',
+          chapter: {
+            id: newId,
+            title: '',
+            content: '',
+            summary: '',
+            status: 'active',
+            createdAt: Math.floor(Date.now() / 1000),
+          },
+        })
+        dispatch({ type: 'SET_ACTIVE_CHAPTER', id: newId })
+        dispatch({ type: 'SET_VIEWING_CHAPTER', id: newId })
+      }
+    }
+    dispatch({ type: 'REMOVE_CHAPTER', id })
+    // Also detach from any parent act's children list.
+    const updatedChapters = cur.chapters
+      .filter(c => c.id !== id)
+      .map(c => c.status === 'act' && c.children?.includes(id)
+        ? { ...c, children: c.children.filter(cid => cid !== id) }
+        : c)
+    dispatch({ type: 'SET_CHAPTERS', chapters: updatedChapters })
   }, [])
 
   const doUpdateStats = useCallback(async () => {
-    if (!state.secs.length || state.stUp) return
+    const cur = stateRef.current
+    if (!cur.secs.length || cur.stUp) return
+    const active = getActiveChapter(cur)
     dispatch({ type: 'SET_STUP', stUp: true })
     dispatch({ type: 'SET_GEN_STAGE', stage: 'stats' })
     dispatch({ type: 'SET_ERR', err: '' })
 
     try {
-      const updated = await api.updateStats(state.secs, state.story)
+      const updated = await api.updateStats(cur.secs, active?.content || '')
       dispatch({ type: 'SET_SECS', secs: updated })
     } catch (e) {
       dispatch({ type: 'SET_ERR', err: 'Stats update failed: ' + (e instanceof Error ? e.message : '') })
     }
     dispatch({ type: 'SET_GEN_STAGE', stage: null })
     dispatch({ type: 'SET_STUP', stUp: false })
-  }, [state.secs, state.story, state.stUp])
+  }, [])
 
-  // Keep refs in sync and trigger deferred updates
   doUpdateStatsRef.current = doUpdateStats
-  doSummarizeRef.current = doSummarize
   useEffect(() => {
     if (!state.gen && pendingStatsUpdate && state.secs.length > 0) {
       setPendingStatsUpdate(false)
@@ -458,29 +671,16 @@ export function useGameState() {
     }
   }, [state.gen, pendingStatsUpdate, state.secs.length])
 
-  useEffect(() => {
-    if (!state.gen && pendingSummarize) {
-      setPendingSummarize(false)
-      doSummarizeRef.current(true)
-    }
-  }, [state.gen, pendingSummarize])
-
-  // Cancel any debounced save and force a synchronous flush with the current state.
-  // Called before session switches so the old session's edits land before we point away.
   const flushPendingSave = useCallback(async () => {
     clearTimeout(saveTimer.current)
     if (!state.sessionId || state.phase === 'hub') return
-    const { name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts } = state
-    try {
-      await api.saveState({ name, story, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff, summaries, lore, sumUpTo, autoSum, autoAccept, sumThreshold, secs, auFreq, tts })
-    } catch { /* ignore — 409 means user switched already, nothing to preserve */ }
+    try { await api.saveState(toPersistable(state)) } catch { /* ignore */ }
   }, [state])
 
   const abortGeneration = useCallback(() => {
     abortRef.current?.abort()
   }, [])
 
-  // "New" now routes to the session hub instead of wiping the current save.
   const enterHub = useCallback(() => {
     genCountRef.current = 0
     api.setCurrentSessionId('')
@@ -498,11 +698,19 @@ export function useGameState() {
   }, [])
 
   const exportMd = useCallback(() => {
+    const cur = stateRef.current
+    const body = cur.chapters.map(c => {
+      const title = c.title || ''
+      if (c.status === 'active') return `## ${title || 'Current'}\n\n${c.content}`
+      if (c.status === 'closed') return `## ${title}\n\n${c.summary}`
+      if (c.status === 'act') return `## ${title} (condensed)\n\n${c.summary}`
+      return ''
+    }).filter(Boolean).join('\n\n')
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([`# ${state.overview || 'Adventure'}\n\n${state.story}`], { type: 'text/markdown' }))
+    a.href = URL.createObjectURL(new Blob([`# ${cur.overview || 'Adventure'}\n\n${body}`], { type: 'text/markdown' }))
     a.download = 'adventure.md'
     a.click()
-  }, [state.overview, state.story])
+  }, [])
 
   const loadFile = useCallback(() => {
     const inp = document.createElement('input')
@@ -524,12 +732,9 @@ export function useGameState() {
   }, [])
 
   // Computed values
-  const wt = wordCount(state.story)
-  const threshold = state.sumThreshold || 2500
-  const KR = Math.floor(threshold * 0.8)
-  const canSummarize = state.story.length > state.sumUpTo + threshold
-  const textToSummarize = canSummarize ? state.story.slice(state.sumUpTo, state.story.length - KR) : ''
-  const summarizeWordCount = wordCount(textToSummarize)
+  const activeChapter = getActiveChapter(state)
+  const viewingChapter = getViewingChapter(state)
+  const activeWordCount = wordCount(activeChapter?.content || '')
 
   return {
     state,
@@ -542,9 +747,16 @@ export function useGameState() {
       regen,
       deleteLast,
       stop,
-      doSummarize,
-      confirmSummary,
-      dismissSummary,
+      openChapter,
+      returnToActive,
+      editChapter,
+      resummarizeChapter,
+      endChapterAndStartNew,
+      rewindToChapter,
+      unarchiveChapter,
+      createAct,
+      unactAct,
+      deleteChapter,
       doUpdateStats,
       enterHub,
       saveFile,
@@ -555,9 +767,10 @@ export function useGameState() {
       abortGeneration,
     },
     computed: {
-      wordCount: wt,
-      canSummarize,
-      summarizeWordCount,
+      activeChapter,
+      viewingChapter,
+      isViewingActive,
+      activeWordCount,
     },
   }
 }

@@ -14,6 +14,8 @@ interface Props {
   cStyle: string
   overview: string
   diff: string
+  effectiveCtxTokens: number
+  modelCtxMax?: number
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onSwitch?: (panel: PanelId) => void
   displayPrefs: DisplayPrefs
@@ -27,10 +29,11 @@ interface Props {
 }
 
 export default function SettingsPanel({
-  show, onClose, style, cStyle, overview, diff, setField, onSwitch,
+  show, onClose, style, cStyle, overview, diff, effectiveCtxTokens, modelCtxMax, setField, onSwitch,
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize,
   tts, dispatch, ttsPlaying, onStopTTS,
 }: Props) {
+  const ctxMax = Math.max(modelCtxMax || 128000, 8000)
   const activeModel = tts?.activeModel || 'Kokoro-82m'
   const modelMeta = getModelMeta(activeModel)
   const modelSettings = getModelSettings(tts, activeModel)
@@ -87,6 +90,19 @@ export default function SettingsPanel({
             <option value="normal">Normal</option>
             <option value="hard">Hard (permadeath)</option>
           </select>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Effective context ({(effectiveCtxTokens / 1000).toFixed(0)}k / {(ctxMax / 1000).toFixed(0)}k supported)</label>
+          <input
+            type="range"
+            min={8000}
+            max={ctxMax}
+            step={1000}
+            value={Math.min(effectiveCtxTokens, ctxMax)}
+            onChange={e => setField('effectiveCtxTokens', Number(e.target.value))}
+          />
+          <div className="hint">Token budget for each prompt. The app warns at 65% and blocks generation at 90%.</div>
         </div>
 
         <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>

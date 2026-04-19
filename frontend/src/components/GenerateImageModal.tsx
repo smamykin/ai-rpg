@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import type { GalleryImage, ImageModelInfo, LoreEntry, Summary } from '../types'
+import type { GalleryImage, ImageModelInfo, LoreEntry } from '../types'
 import { DIMENSION_PRESETS, uid } from '../types'
 import * as api from '../api'
 
 interface GameContext {
-  story: string
-  summaries: Summary[]
+  story: string             // active chapter content
+  summaries: string         // joined chapter summaries
   lore: LoreEntry[]
   overview: string
-  sumUpTo: number
 }
 
 interface Props {
@@ -117,8 +116,8 @@ export default function GenerateImageModal({
   const buildContext = () => {
     const ctx: Parameters<typeof api.enhanceImagePrompt>[1] = {}
     if (ctxOverview && gameState.overview) ctx.overview = gameState.overview
-    if (ctxSummaries && gameState.summaries.length > 0) {
-      ctx.summaries = gameState.summaries.map(s => s.text).join('\n\n')
+    if (ctxSummaries && gameState.summaries) {
+      ctx.summaries = gameState.summaries
     }
     if (ctxStory && gameState.story) {
       const recent = gameState.story.slice(-2000)

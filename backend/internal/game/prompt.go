@@ -27,36 +27,6 @@ Rules:
 func BuildPrompt(state *GameState, task, action string) string {
 	var b strings.Builder
 
-	// Ancient-tier summaries (condensed deep history)
-	var ancients []Summary
-	for _, s := range state.Summaries {
-		if s.Tier == "ancient" && strings.TrimSpace(s.Text) != "" {
-			ancients = append(ancients, s)
-		}
-	}
-	if len(ancients) > 0 {
-		b.WriteString("# Deep History (condensed):\n")
-		for _, s := range ancients {
-			b.WriteString(strings.TrimSpace(s.Text))
-			b.WriteString("\n\n")
-		}
-	}
-
-	// Recent-tier summaries
-	var recents []Summary
-	for _, s := range state.Summaries {
-		if s.Tier == "recent" && strings.TrimSpace(s.Text) != "" {
-			recents = append(recents, s)
-		}
-	}
-	if len(recents) > 0 {
-		b.WriteString("# Summary of Earlier Events:\n")
-		for _, s := range recents {
-			b.WriteString(strings.TrimSpace(s.Text))
-			b.WriteString("\n\n")
-		}
-	}
-
 	// Lore entries (only enabled)
 	var enabledLore []LoreEntry
 	for _, l := range state.Lore {
@@ -76,13 +46,11 @@ func BuildPrompt(state *GameState, task, action string) string {
 		fmt.Fprintf(&b, "# Adventure Overview:\n%s\n\n", state.Overview)
 	}
 
-	// Story so far (only unsummarized portion)
-	story := state.Story
-	if state.SumUpTo > 0 && state.SumUpTo < len(story) {
-		story = story[state.SumUpTo:]
-	}
-	if strings.TrimSpace(story) != "" {
-		fmt.Fprintf(&b, "# Story So Far (player actions prefixed with \">\"):\n%s\n\n", strings.TrimSpace(story))
+	// Story so far — chapters in order. Acts and closed chapters contribute summary;
+	// the active chapter contributes full content.
+	storyBody := buildStoryBody(state)
+	if strings.TrimSpace(storyBody) != "" {
+		b.WriteString(storyBody)
 	}
 
 	// Game state sections
@@ -129,6 +97,75 @@ func BuildPrompt(state *GameState, task, action string) string {
 	return b.String()
 }
 
+// buildStoryBody assembles the story-so-far section of the prompt. Acts and closed
+// chapters contribute their summary; the active chapter contributes its full content.
+// Children of acts are skipped (only the act's own summary matters to the model).
+func buildStoryBody(state *GameState) string {
+	var b strings.Builder
+	hasAny := false
+
+	writeHeader := func() {
+		if !hasAny {
+			b.WriteString("# Story So Far (player actions prefixed with \">\"):\n\n")
+			hasAny = true
+		}
+	}
+
+	// Collect IDs of chapters that are children of any act — these are skipped (the act represents them).
+	childOfAct := map[string]bool{}
+	for _, c := range state.Chapters {
+		if c.Status == "act" {
+			for _, id := range c.Children {
+				childOfAct[id] = true
+			}
+		}
+	}
+
+	for _, c := range state.Chapters {
+		if childOfAct[c.ID] {
+			continue
+		}
+		title := chapterTitleOrFallback(c)
+		switch c.Status {
+		case "act":
+			s := strings.TrimSpace(c.Summary)
+			if s == "" {
+				continue
+			}
+			writeHeader()
+			fmt.Fprintf(&b, "## %s (condensed)\n%s\n\n", title, s)
+		case "closed":
+			s := strings.TrimSpace(c.Summary)
+			if s == "" {
+				continue
+			}
+			writeHeader()
+			fmt.Fprintf(&b, "## %s\n%s\n\n", title, s)
+		case "active":
+			content := strings.TrimSpace(c.Content)
+			if content == "" {
+				continue
+			}
+			writeHeader()
+			if title != "" {
+				fmt.Fprintf(&b, "## %s (current)\n%s\n\n", title, content)
+			} else {
+				fmt.Fprintf(&b, "## Current chapter\n%s\n\n", content)
+			}
+		}
+	}
+
+	return b.String()
+}
+
+func chapterTitleOrFallback(c Chapter) string {
+	t := strings.TrimSpace(c.Title)
+	if t != "" {
+		return t
+	}
+	return ""
+}
+
 // MaxTokensForStyle returns the max_tokens value based on the response length style.
 func MaxTokensForStyle(style string) int {
 	switch style {
@@ -143,4 +180,56 @@ func MaxTokensForStyle(style string) int {
 	default:
 		return 400
 	}
+}
+
+// SummarizeSystemPrompt is used for per-chapter summarization.
+const SummarizeSystemPrompt = `You are a precise narrative summarizer for a text RPG. Your summaries are the memory of the story — they are what the Game Master reads to remember what happened. Preserve player agency and continuity above all else.`
+
+// SummarizeUserPrompt returns the instruction+payload for per-chapter summarization.
+// The input text is raw story content (player actions prefixed with ">").
+func SummarizeUserPrompt(text string) string {
+	return `Summarize this chapter in roughly one third of its length. Write in past tense, narrator voice.
+
+MUST preserve:
+- Every named character and their role/state (alive, injured, angry at whom, with whom)
+- Items gained, lost, used, or broken
+- Locations visited, in order
+- Player decisions and their consequences (player actions were prefixed with "> " in the text)
+- Unresolved threads, promises, deadlines, open questions
+- Relationship changes between characters
+- Any rules, mechanics, or world-state changes
+
+OMIT:
+- Scenery and mood prose beyond what affects plot
+- Dialogue unless it reveals a decision, commitment, or key fact
+- Redundant action beats
+
+Output ONLY the summary prose. No meta commentary, no bullet list, no headers.
+
+---
+` + text
+}
+
+// CondenseSystemPrompt is used when condensing multiple chapter summaries into one act summary.
+const CondenseSystemPrompt = `You are a precise narrative summarizer. Condense multiple chapter summaries into a single cohesive overview, preserving continuity signals (characters, items, unresolved threads).`
+
+// CondenseUserPrompt returns the instruction+payload for act condensation.
+func CondenseUserPrompt(joinedSummaries string) string {
+	return `Condense these chapter summaries into one cohesive overview at roughly one third of the combined length. Past tense, narrator voice.
+
+MUST preserve:
+- Named characters still relevant to current events and their state
+- Items and locations that matter going forward
+- Unresolved threads, open questions, commitments
+- Key turning points
+
+OMIT:
+- Resolved side-plots that no longer affect the present
+- Minor characters who have left the story
+- Procedural detail
+
+Output ONLY the condensed summary. No meta commentary.
+
+---
+` + joinedSummaries
 }

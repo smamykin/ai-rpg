@@ -1,8 +1,11 @@
-export interface Summary {
+export interface Chapter {
   id: string
-  text: string
-  tier: 'recent' | 'ancient'
-  charRange: [number, number]
+  title: string
+  content: string                    // empty for acts
+  summary: string                    // empty while active
+  status: 'active' | 'closed' | 'act'
+  children?: string[]                // chapter IDs — only on acts
+  summaryStale?: boolean
   createdAt: number
 }
 
@@ -43,7 +46,6 @@ export interface GameState {
   lastPlayedAt: number
   modelRoles: Record<string, string>
 
-  story: string
   overview: string
   style: string
   cStyle: string
@@ -51,20 +53,21 @@ export interface GameState {
   supportModel: string
   arc: string
   diff: string
-  summaries: Summary[]
   lore: LoreEntry[]
-  sumUpTo: number
-  autoSum: boolean
-  autoAccept: boolean
-  sumThreshold: number
   secs: Section[]
   auFreq: number
   tts: TTSSettings
-  format?: string
 
-  // Legacy fields — present only in old saves before migration
-  mems?: { id: string; text: string }[]
-  addlMem?: string
+  // Chapters
+  chapters: Chapter[]
+  activeChapterId: string
+  viewingChapterId: string
+  archivedChapters: Chapter[]
+
+  // Context budget
+  effectiveCtxTokens: number
+
+  format?: string
 }
 
 export interface SessionMeta {
@@ -131,7 +134,7 @@ export interface GalleryImage {
   createdAt: number
   source: 'story' | 'lore'
   loreEntryId?: string
-  sessionId?: string | null  // null = pre-v2 image with no session origin
+  sessionId?: string | null
 }
 
 export const DIMENSION_PRESETS = [
@@ -152,14 +155,28 @@ export const STYLES = [
   { label: 'Detailed', value: '3-4 detailed paragraphs' },
 ] as const
 
+let _counter = 0
+export function uid(prefix = 's'): string {
+  return prefix + (++_counter) + '_' + Date.now()
+}
+
+export function newChapterId(): string {
+  return 'ch_' + Date.now() + '_' + (++_counter)
+}
+
+export function wordCount(text: string): number {
+  return text.trim() ? text.trim().split(/\s+/).length : 0
+}
+
 export function defaultState(): GameState {
+  const chapterId = newChapterId()
+  const now = 0
   return {
     sessionId: '',
     name: 'Adventure',
     createdAt: 0,
     lastPlayedAt: 0,
     modelRoles: {},
-    story: '',
     overview: '',
     style: '1 paragraph',
     cStyle: '',
@@ -167,23 +184,34 @@ export function defaultState(): GameState {
     supportModel: '',
     arc: '',
     diff: 'normal',
-    summaries: [],
     lore: [],
-    sumUpTo: 0,
-    autoSum: false,
-    autoAccept: false,
-    sumThreshold: 2500,
     secs: [],
     auFreq: 0,
     tts: { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
+    chapters: [{
+      id: chapterId,
+      title: '',
+      content: '',
+      summary: '',
+      status: 'active',
+      createdAt: now,
+    }],
+    activeChapterId: chapterId,
+    viewingChapterId: chapterId,
+    archivedChapters: [],
+    effectiveCtxTokens: 32000,
   }
 }
 
-let _counter = 0
-export function uid(): string {
-  return 's' + (++_counter) + '_' + Date.now()
+// Helpers
+export function findChapter(state: Pick<GameState, 'chapters'>, id: string): Chapter | undefined {
+  return state.chapters.find(c => c.id === id)
 }
 
-export function wordCount(text: string): number {
-  return text.trim() ? text.trim().split(/\s+/).length : 0
+export function getActiveChapter(state: Pick<GameState, 'chapters' | 'activeChapterId'>): Chapter | undefined {
+  return findChapter(state, state.activeChapterId)
+}
+
+export function getViewingChapter(state: Pick<GameState, 'chapters' | 'viewingChapterId' | 'activeChapterId'>): Chapter | undefined {
+  return findChapter(state, state.viewingChapterId) || findChapter(state, state.activeChapterId)
 }
