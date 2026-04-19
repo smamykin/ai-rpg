@@ -42,24 +42,39 @@ export default function ScenarioPicker({ show, onClose, onPick, onEditScenario, 
     }
   }
 
-  const onFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (e.target) e.target.value = ''
-    if (!file) return
+  const importFromText = async (text: string, sourceLabel: string) => {
     setErr('')
     setImporting(true)
     try {
-      const text = await file.text()
       let obj: unknown
-      try { obj = JSON.parse(text) } catch { throw new Error('Not a valid JSON file') }
+      try { obj = JSON.parse(text) } catch { throw new Error(`${sourceLabel} is not valid JSON`) }
       const cleaned = validateScenario(obj)
-      if (!cleaned) throw new Error('File is not a scenario (missing name/overview)')
+      if (!cleaned) throw new Error(`${sourceLabel} is not a scenario (missing name/overview)`)
       const created = await api.createScenario(cleaned)
       setScenarios(prev => [created, ...prev.filter(s => s.id !== created.id)])
     } catch (ex) {
       setErr((ex as Error).message)
     } finally {
       setImporting(false)
+    }
+  }
+
+  const onFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (e.target) e.target.value = ''
+    if (!file) return
+    const text = await file.text()
+    await importFromText(text, 'File')
+  }
+
+  const onPasteImport = async () => {
+    setErr('')
+    try {
+      const text = await navigator.clipboard.readText()
+      if (!text.trim()) { setErr('Clipboard is empty'); return }
+      await importFromText(text, 'Clipboard')
+    } catch {
+      setErr('Could not read from clipboard')
     }
   }
 
@@ -107,8 +122,11 @@ export default function ScenarioPicker({ show, onClose, onPick, onEditScenario, 
           >
             {copied ? '\u2713 Prompt copied' : 'Scenario creation prompt'}
           </button>
+          <button className="b bs" disabled={importing} onClick={onPasteImport}>
+            {importing ? 'Importing...' : 'Paste'}
+          </button>
           <button className="b bs" disabled={importing} onClick={() => fileRef.current?.click()}>
-            {importing ? 'Importing...' : 'Import'}
+            {importing ? 'Importing...' : 'Import file'}
           </button>
           <input
             ref={fileRef}
