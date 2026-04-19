@@ -72,7 +72,7 @@ type LoreEntry struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Text    string `json:"text"`
-	Tag     string `json:"tag"` // "world", "character", "rule", "quest", "other"
+	Tag     string `json:"tag"` // "world", "character", "rule", "quest", "item", "creature", "other"
 	Enabled bool   `json:"enabled"`
 }
 

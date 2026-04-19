@@ -12,6 +12,11 @@ interface Props {
   onDeleted?: (id: string) => void
 }
 
+function filenameFor(name: string): string {
+  const s = (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+  return s || 'scenario'
+}
+
 export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDeleted }: Props) {
   const [sc, setSc] = useState<Scenario>(() => defaultScenario())
   const [loading, setLoading] = useState(false)
@@ -57,6 +62,19 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
     } catch (e) {
       setErr((e as Error).message)
     }
+  }
+
+  const doExport = () => {
+    const data = JSON.stringify(sc, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filenameFor(sc.name) + '.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   if (loading) {
@@ -152,6 +170,9 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
           <button className="b ba" disabled={saving || !sc.name.trim()} onClick={save} style={{ flex: 1, padding: '.65rem', fontWeight: 600 }}>
             {saving ? 'Saving...' : 'Save'}
           </button>
+          {scenarioId && (
+            <button className="b bs" onClick={doExport} title="Download scenario as JSON">Export</button>
+          )}
           <button className="b bs" onClick={onCancel}>Cancel</button>
         </div>
 

@@ -17,7 +17,7 @@ export interface LoreEntry {
   enabled: boolean
 }
 
-export const LORE_TAGS = ['world', 'character', 'rule', 'quest', 'other'] as const
+export const LORE_TAGS = ['world', 'character', 'rule', 'quest', 'item', 'creature', 'other'] as const
 
 export interface Section {
   id: string
@@ -104,6 +104,57 @@ export function defaultScenario(): Scenario {
     diff: 'normal',
     lore: [],
     secs: [],
+    createdAt: 0,
+    updatedAt: 0,
+  }
+}
+
+function asString(v: unknown): string {
+  return typeof v === 'string' ? v : ''
+}
+
+export function validateScenario(obj: unknown): Scenario | null {
+  if (!obj || typeof obj !== 'object') return null
+  const o = obj as Record<string, unknown>
+  const name = asString(o.name).trim()
+  const overview = asString(o.overview).trim()
+  if (!name && !overview) return null
+
+  const lore = Array.isArray(o.lore)
+    ? (o.lore as unknown[]).filter(e => e && typeof e === 'object').map(e => {
+      const l = e as Record<string, unknown>
+      return {
+        id: asString(l.id) || uid('l'),
+        name: asString(l.name),
+        text: asString(l.text),
+        tag: asString(l.tag) || 'other',
+        enabled: l.enabled !== false,
+      }
+    })
+    : []
+
+  const secs = Array.isArray(o.secs)
+    ? (o.secs as unknown[]).filter(e => e && typeof e === 'object').map(e => {
+      const s = e as Record<string, unknown>
+      return {
+        id: asString(s.id) || uid('s'),
+        name: asString(s.name),
+        description: asString(s.description),
+        content: asString(s.content),
+      }
+    })
+    : []
+
+  return {
+    id: '',
+    name: asString(o.name),
+    description: asString(o.description),
+    overview: asString(o.overview),
+    cStyle: asString(o.cStyle),
+    style: asString(o.style) || '1 paragraph',
+    diff: asString(o.diff) || 'normal',
+    lore,
+    secs,
     createdAt: 0,
     updatedAt: 0,
   }

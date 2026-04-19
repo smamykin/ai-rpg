@@ -10,6 +10,8 @@ const TAG_COLORS: Record<string, string> = {
   character: 'var(--ac2)',
   rule: 'var(--mt)',
   quest: 'var(--dng)',
+  item: 'var(--itm)',
+  creature: 'var(--crt)',
   other: 'var(--bd)',
 }
 

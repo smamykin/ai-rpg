@@ -56,6 +56,8 @@ Rules:
 		"world":     "Location or extent, history, culture, notable features, role in the story.",
 		"rule":      "When and where it applies, exact constraints, exceptions, consequences of breaking it.",
 		"quest":     "Giver, objective, reward, complications, current state.",
+		"item":      "Origin, appearance, powers or properties, current owner or location, history.",
+		"creature":  "Habitat, appearance, behavior, abilities, threat level, lore or origin.",
 		"other":     "Whatever is most salient about the subject.",
 	}
 

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Scenario } from '../types'
+import { validateScenario } from '../types'
+import { SCENARIO_CREATION_PROMPT } from '../constants/scenarioPrompt'
 import * as api from '../api'
 
 interface Props {
@@ -14,15 +16,52 @@ interface Props {
 export default function ScenarioPicker({ show, onClose, onPick, onEditScenario, onNewScenario, refreshKey = 0 }: Props) {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const fileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!show) return
+    setErr('')
     setLoading(true)
     api.listScenarios()
       .then(setScenarios)
       .catch(() => setScenarios([]))
       .finally(() => setLoading(false))
   }, [show, refreshKey])
+
+  const onCopyPrompt = async () => {
+    setErr('')
+    try {
+      await navigator.clipboard.writeText(SCENARIO_CREATION_PROMPT)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setErr('Could not copy to clipboard')
+    }
+  }
+
+  const onFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (e.target) e.target.value = ''
+    if (!file) return
+    setErr('')
+    setImporting(true)
+    try {
+      const text = await file.text()
+      let obj: unknown
+      try { obj = JSON.parse(text) } catch { throw new Error('Not a valid JSON file') }
+      const cleaned = validateScenario(obj)
+      if (!cleaned) throw new Error('File is not a scenario (missing name/overview)')
+      const created = await api.createScenario(cleaned)
+      setScenarios(prev => [created, ...prev.filter(s => s.id !== created.id)])
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setImporting(false)
+    }
+  }
 
   if (!show) return null
 
@@ -31,6 +70,7 @@ export default function ScenarioPicker({ show, onClose, onPick, onEditScenario, 
       <div className="mov" onClick={onClose} />
       <div className="mdl">
         <div className="mdl-h">Start new adventure</div>
+        {err && <div className="er" style={{ margin: '0 0 .5rem' }}>{err}</div>}
         <div className="spk-grid">
           <button className="spk-card" onClick={() => { onPick(); onClose() }}>
             <div className="spk-name">Blank</div>
@@ -60,6 +100,23 @@ export default function ScenarioPicker({ show, onClose, onPick, onEditScenario, 
           {onNewScenario && (
             <button className="b bs" onClick={() => { onClose(); onNewScenario() }}>+ New scenario</button>
           )}
+          <button
+            className="b bs"
+            onClick={onCopyPrompt}
+            title="Copy an AI prompt that helps you design a scenario; paste the JSON it returns into Import"
+          >
+            {copied ? '\u2713 Prompt copied' : 'Scenario creation prompt'}
+          </button>
+          <button className="b bs" disabled={importing} onClick={() => fileRef.current?.click()}>
+            {importing ? 'Importing...' : 'Import'}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={onFilePick}
+          />
           <button className="b bs" onClick={onClose}>Cancel</button>
         </div>
       </div>
