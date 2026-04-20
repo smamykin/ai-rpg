@@ -1,6 +1,7 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
 import type { Chapter, GameState, LoreEntry, Section, Phase, TTSModelSettings } from '../types'
 import { defaultState, getActiveChapter, getViewingChapter, newChapterId, wordCount } from '../types'
+import { expandShortcut } from '../utils/shortcuts'
 import * as api from '../api'
 
 interface State extends GameState {
@@ -379,7 +380,7 @@ export function useGameState() {
 
   const submit = useCallback((action: string) => {
     if (!action.trim() || state.gen || state.summing || !isViewingActive) return
-    generate('action', action.trim())
+    generate('action', expandShortcut(action.trim()))
   }, [generate, state.gen, state.summing, isViewingActive])
 
   const cont = useCallback(() => {
