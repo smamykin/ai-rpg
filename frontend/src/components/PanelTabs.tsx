@@ -1,4 +1,4 @@
-export type PanelId = 'mem' | 'gallery' | 'track' | 'settings' | 'ai'
+export type PanelId = 'mem' | 'gallery' | 'track' | 'settings' | 'ai' | 'prompt'
 
 const TABS: { id: PanelId; label: string }[] = [
   { id: 'mem', label: 'Mem' },
@@ -6,6 +6,7 @@ const TABS: { id: PanelId; label: string }[] = [
   { id: 'track', label: 'Trk' },
   { id: 'settings', label: 'Set' },
   { id: 'ai', label: 'AI' },
+  { id: 'prompt', label: 'Pv' },
 ]
 
 interface Props {

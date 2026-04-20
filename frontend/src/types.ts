@@ -199,6 +199,21 @@ export const DIMENSION_PRESETS = [
 export type Phase = 'hub' | 'setup' | 'playing' | 'scenarioEditor'
 export type Task = 'open' | 'action' | 'continue'
 
+export interface PromptSection {
+  label: string
+  text: string
+  tokens: number
+}
+
+export interface PromptPreview {
+  system: PromptSection
+  sections: PromptSection[]
+  user: string
+  response: number
+  total: number
+  budget: number
+}
+
 export const STYLES = [
   { label: '1 paragraph', value: '1 paragraph' },
   { label: '2-3 paragraphs', value: '2-3 paragraphs' },

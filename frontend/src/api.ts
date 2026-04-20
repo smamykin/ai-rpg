@@ -1,4 +1,4 @@
-import type { GameState, ModelInfo, ImageModelInfo, Section, SessionMeta, Scenario } from './types'
+import type { GameState, ModelInfo, ImageModelInfo, PromptPreview, Section, SessionMeta, Scenario } from './types'
 
 const BASE = '/api'
 
@@ -253,6 +253,13 @@ export async function tts(req: TTSRequest, signal?: AbortSignal): Promise<Blob> 
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
   }
   return res.blob()
+}
+
+export async function previewPrompt(task: string, action: string): Promise<PromptPreview> {
+  return fetchJSON<PromptPreview>('/prompt/preview', {
+    method: 'POST',
+    body: JSON.stringify({ task, action }),
+  })
 }
 
 export async function transform(text: string, instruction: string): Promise<string> {

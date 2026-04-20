@@ -7,6 +7,7 @@ import TrackingPanel from './panels/TrackingPanel'
 import SettingsPanel from './panels/SettingsPanel'
 import GalleryPanel from './panels/GalleryPanel'
 import OutlinePanel from './panels/OutlinePanel'
+import PromptPanel from './panels/PromptPanel'
 import GenerateImageModal from './GenerateImageModal'
 import SaveAsScenarioModal from './SaveAsScenarioModal'
 import RewindModal from './RewindModal'
@@ -279,6 +280,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         case '3': openPanel(activePanel === 'track' ? null : 'track'); break
         case '4': openPanel(activePanel === 'settings' ? null : 'settings'); break
         case '5': openPanel(activePanel === 'ai' ? null : 'ai'); break
+        case '6': openPanel(activePanel === 'prompt' ? null : 'prompt'); break
         case 'o': setShowOutline(s => !s); break
         case 'Escape': setActivePanel(null); setShowOutline(false); break
         case 'a': setShowArc(a => !a); break
@@ -398,6 +400,13 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         dispatch={dispatch} setField={setField}
         onUpdateStats={actions.doUpdateStats}
         onSwitch={openPanel}
+      />
+
+      <PromptPanel
+        show={activePanel === 'prompt'} onClose={() => setActivePanel(null)}
+        onSwitch={openPanel}
+        sessionId={state.sessionId}
+        hasActiveContent={!!(computed.activeChapter?.content || '').trim()}
       />
 
       <SettingsPanel

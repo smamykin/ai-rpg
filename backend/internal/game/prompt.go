@@ -23,11 +23,41 @@ Rules:
 - Avoid purple prose, excessive metaphors, exposition dumps
 - If <current_game_state> is provided, respect it strictly`
 
-// BuildPrompt assembles the full user prompt from all game context.
-func BuildPrompt(state *GameState, task, action string) string {
-	var b strings.Builder
+// PromptSection is one labeled part of the assembled user prompt.
+type PromptSection struct {
+	Label  string `json:"label"`
+	Text   string `json:"text"`
+	Tokens int    `json:"tokens"`
+}
 
-	// Lore entries (only enabled)
+// PromptPreview breaks the prompt down for the UI.
+type PromptPreview struct {
+	System   PromptSection   `json:"system"`
+	Sections []PromptSection `json:"sections"`
+	User     string          `json:"user"`
+	Response int             `json:"response"`
+	Total    int             `json:"total"`
+	Budget   int             `json:"budget"`
+}
+
+// charsPerToken matches frontend/src/utils/budget.ts so the two displays agree.
+const charsPerToken = 4
+
+func estimateTokens(s string) int {
+	n := len(s)
+	if n == 0 {
+		return 0
+	}
+	return (n + charsPerToken - 1) / charsPerToken
+}
+
+// buildSections returns the ordered labeled sections that make up the user prompt.
+// BuildPrompt and BuildPromptPreview both call this so the two cannot drift.
+func buildSections(state *GameState, task, action string) []PromptSection {
+	out := []PromptSection{}
+
+	// Lore
+	var lb strings.Builder
 	var enabledLore []LoreEntry
 	for _, l := range state.Lore {
 		if l.Enabled && strings.TrimSpace(l.Text) != "" {
@@ -35,25 +65,28 @@ func BuildPrompt(state *GameState, task, action string) string {
 		}
 	}
 	if len(enabledLore) > 0 {
-		b.WriteString("# World & Character Lore:\n")
+		lb.WriteString("# World & Character Lore:\n")
 		for _, l := range enabledLore {
-			fmt.Fprintf(&b, "**%s**: %s\n\n", l.Name, strings.TrimSpace(l.Text))
+			fmt.Fprintf(&lb, "**%s**: %s\n\n", l.Name, strings.TrimSpace(l.Text))
 		}
+		out = append(out, PromptSection{Label: "Lore", Text: lb.String()})
 	}
 
 	// Overview
 	if state.Overview != "" {
-		fmt.Fprintf(&b, "# Adventure Overview:\n%s\n\n", state.Overview)
+		out = append(out, PromptSection{
+			Label: "Overview",
+			Text:  fmt.Sprintf("# Adventure Overview:\n%s\n\n", state.Overview),
+		})
 	}
 
-	// Story so far — chapters in order. Acts and closed chapters contribute summary;
-	// the active chapter contributes full content.
-	storyBody := buildStoryBody(state)
-	if strings.TrimSpace(storyBody) != "" {
-		b.WriteString(storyBody)
+	// Story so far
+	if sb := buildStoryBody(state); strings.TrimSpace(sb) != "" {
+		out = append(out, PromptSection{Label: "Story so far", Text: sb})
 	}
 
 	// Game state sections
+	var gb strings.Builder
 	var filled []Section
 	for _, s := range state.Secs {
 		if strings.TrimSpace(s.Content) != "" {
@@ -61,40 +94,94 @@ func BuildPrompt(state *GameState, task, action string) string {
 		}
 	}
 	if len(filled) > 0 {
-		b.WriteString("<current_game_state>\n")
+		gb.WriteString("<current_game_state>\n")
 		for _, s := range filled {
-			fmt.Fprintf(&b, "[%s]:\n%s\n\n", s.Name, strings.TrimSpace(s.Content))
+			fmt.Fprintf(&gb, "[%s]:\n%s\n\n", s.Name, strings.TrimSpace(s.Content))
 		}
-		b.WriteString("</current_game_state>\n\n")
+		gb.WriteString("</current_game_state>\n\n")
+		out = append(out, PromptSection{Label: "Tracking", Text: gb.String()})
 	}
 
 	// Difficulty
 	if state.Diff == "hard" {
-		b.WriteString("DIFFICULTY: VERY HARD — permadeath, realistic consequences, impossible actions fail.\n\n")
+		out = append(out, PromptSection{
+			Label: "Difficulty",
+			Text:  "DIFFICULTY: VERY HARD — permadeath, realistic consequences, impossible actions fail.\n\n",
+		})
 	}
 
 	// Story arc
-	if strings.TrimSpace(state.Arc) != "" {
-		fmt.Fprintf(&b, "NEXT_KEY_EVENT (*naturally* guide the story towards this): %s\n\n", strings.TrimSpace(state.Arc))
-	}
-
-	// Writing style suffix
-	styleSuffix := ""
-	if strings.TrimSpace(state.CStyle) != "" {
-		styleSuffix = "\nWRITING STYLE: " + strings.TrimSpace(state.CStyle)
+	if arc := strings.TrimSpace(state.Arc); arc != "" {
+		out = append(out, PromptSection{
+			Label: "Arc",
+			Text:  fmt.Sprintf("NEXT_KEY_EVENT (*naturally* guide the story towards this): %s\n\n", arc),
+		})
 	}
 
 	// Task instruction
+	styleSuffix := ""
+	if cs := strings.TrimSpace(state.CStyle); cs != "" {
+		styleSuffix = "\nWRITING STYLE: " + cs
+	}
+	var taskText string
 	switch task {
 	case "open":
-		fmt.Fprintf(&b, "TASK: Write the opening paragraph based on the Adventure Overview above. One paragraph only — just the START. Specific situation, maybe NPC dialogue. Avoid grandiose phrasing.%s", styleSuffix)
+		taskText = fmt.Sprintf("TASK: Write the opening paragraph based on the Adventure Overview above. One paragraph only — just the START. Specific situation, maybe NPC dialogue. Avoid grandiose phrasing.%s", styleSuffix)
 	case "action":
-		fmt.Fprintf(&b, "TASK: Player's action: \"%s\"\nWrite direct consequences. Include NPC dialogue if relevant. Do NOT make choices for the player.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s", action, state.Style, styleSuffix)
+		taskText = fmt.Sprintf("TASK: Player's action: \"%s\"\nWrite direct consequences. Include NPC dialogue if relevant. Do NOT make choices for the player.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s", action, state.Style, styleSuffix)
 	default: // "continue"
-		fmt.Fprintf(&b, "TASK: Continue the story naturally. Include dialogue when relevant.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s", state.Style, styleSuffix)
+		taskText = fmt.Sprintf("TASK: Continue the story naturally. Include dialogue when relevant.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s", state.Style, styleSuffix)
+	}
+	out = append(out, PromptSection{Label: "Task", Text: taskText})
+
+	// Fill token counts.
+	for i := range out {
+		out[i].Tokens = estimateTokens(out[i].Text)
+	}
+	return out
+}
+
+// BuildPrompt assembles the full user prompt from all game context.
+func BuildPrompt(state *GameState, task, action string) string {
+	var b strings.Builder
+	for _, s := range buildSections(state, task, action) {
+		b.WriteString(s.Text)
+	}
+	return b.String()
+}
+
+// BuildPromptPreview returns the prompt in labeled sections with token estimates.
+// The system prompt is reported separately; the "response" field reflects the
+// reserved headroom for the model's reply.
+func BuildPromptPreview(state *GameState, task, action string) PromptPreview {
+	sections := buildSections(state, task, action)
+
+	var ub strings.Builder
+	for _, s := range sections {
+		ub.WriteString(s.Text)
+	}
+	user := ub.String()
+
+	sysSection := PromptSection{
+		Label:  "System",
+		Text:   SystemPrompt,
+		Tokens: estimateTokens(SystemPrompt),
+	}
+	response := MaxTokensForStyle(state.Style)
+
+	total := sysSection.Tokens + response
+	for _, s := range sections {
+		total += s.Tokens
 	}
 
-	return b.String()
+	return PromptPreview{
+		System:   sysSection,
+		Sections: sections,
+		User:     user,
+		Response: response,
+		Total:    total,
+		Budget:   state.EffectiveCtxTokens,
+	}
 }
 
 // buildStoryBody assembles the story-so-far section of the prompt. Acts and closed
@@ -211,7 +298,7 @@ Output ONLY the summary prose. No meta commentary, no bullet list, no headers.
 }
 
 // CondenseSystemPrompt is used when condensing multiple chapter summaries into one act summary.
-const CondenseSystemPrompt = `You are a precise narrative summarizer. Condense multiple chapter summaries into a single cohesive overview, preserving continuity signals (characters, items, unresolved threads).`
+const CondenseSystemPrompt = `You are a precise narrative summarizer. Condense multiple chapter summaries into one cohesive overview, preserving continuity signals (characters, items, unresolved threads).`
 
 // CondenseUserPrompt returns the instruction+payload for act condensation.
 func CondenseUserPrompt(joinedSummaries string) string {

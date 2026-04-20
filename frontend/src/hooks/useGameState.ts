@@ -343,6 +343,17 @@ export function useGameState() {
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
           if (text.trim()) dispatch({ type: 'SET_LAST_NARRATION', text: text.trim() })
 
+          // Flush immediately so a reload right after completion preserves the result.
+          // The debounced auto-save would otherwise drop it if the user reloads within 1s.
+          const latest = stateRef.current
+          const flushed: State = {
+            ...latest,
+            chapters: latest.chapters.map(c => c.id === active.id ? { ...c, content: finalContent } : c),
+          }
+          clearTimeout(saveTimer.current)
+          skipNextSave.current = true
+          api.saveState(toPersistable(flushed)).catch(() => {})
+
           if (text.trim() && cur.auFreq > 0 && cur.secs.length > 0) {
             genCountRef.current++
             if (genCountRef.current >= cur.auFreq) {

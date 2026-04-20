@@ -276,6 +276,51 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"sections": updated})
 }
 
+// PromptPreview returns the assembled prompt (with per-section token estimates)
+// without sending it to the model. Mirrors the mutation that Generate applies
+// when task=action (appending the action to the active chapter) on an in-memory
+// copy so the preview matches what Generate would build.
+func (h *Handlers) PromptPreview(w http.ResponseWriter, r *http.Request) {
+	curID := h.validateSession(w, r)
+	if curID == "" {
+		return
+	}
+
+	var req GenerateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	state, err := h.sessions.Get(curID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if req.Task == "action" && strings.TrimSpace(req.Action) != "" {
+		// Clone chapters so the hypothetical append doesn't persist.
+		chapters := make([]game.Chapter, len(state.Chapters))
+		copy(chapters, state.Chapters)
+		state.Chapters = chapters
+		for i := range state.Chapters {
+			if state.Chapters[i].ID == state.ActiveChapterID {
+				if strings.TrimSpace(state.Chapters[i].Content) != "" {
+					state.Chapters[i].Content = strings.TrimSpace(state.Chapters[i].Content) + "\n\n> " + req.Action
+				} else {
+					state.Chapters[i].Content = "> " + req.Action
+				}
+				break
+			}
+		}
+	}
+
+	preview := game.BuildPromptPreview(state, req.Task, req.Action)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(preview)
+}
+
 type TransformRequest struct {
 	Text        string `json:"text"`
 	Instruction string `json:"instruction"`

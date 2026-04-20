@@ -70,6 +70,7 @@ func NewRouter(cfg *Config) *chi.Mux {
 
 	r.Get("/api/models", h.GetModels)
 	r.Post("/api/generate", h.Generate)
+	r.Post("/api/prompt/preview", h.PromptPreview)
 	r.Post("/api/summarize", h.Summarize)
 	r.Post("/api/update-stats", h.UpdateStats)
 	r.Post("/api/transform", h.Transform)
