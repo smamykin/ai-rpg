@@ -217,7 +217,6 @@ function toPersistable(s: State): Partial<GameState> {
 export function useGameState() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const abortRef = useRef<AbortController | null>(null)
-  const beforeRef = useRef('')
   const genCountRef = useRef(0)
   const [pendingStatsUpdate, setPendingStatsUpdate] = useState(false)
   const stateRef = useRef(state)
@@ -306,7 +305,6 @@ export function useGameState() {
     dispatch({ type: 'SET_STREAMING', text: '' })
 
     const base = baseContent ?? active.content
-    beforeRef.current = base
 
     let currentContent = base
     if (task === 'action' && actionText) {
@@ -389,24 +387,37 @@ export function useGameState() {
     generate(isFirstChunk ? 'open' : 'continue')
   }, [generate, state, isViewingActive])
 
+  // Regen re-does the last generation. It derives its base from the active chapter's
+  // content (not a transient ref — that resets on reload) by stripping the last
+  // generated paragraph. If the chunk before that is a player action ("> ..."),
+  // the regen re-runs as 'action' preserving the action line.
   const regen = useCallback(() => {
     if (state.gen || state.summing || !isViewingActive) return
     const active = getActiveChapter(state)
     if (!active) return
-    const base = beforeRef.current
-    const chunks = (base || '').trim().split(/\n\n/)
-    const last = chunks[chunks.length - 1] || ''
 
-    if (last.startsWith('> ')) {
-      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
-      generate('action', last.replace(/^> /, ''), chunks.slice(0, -1).join('\n\n'))
-    } else if (!base) {
+    const trimmed = active.content.trim()
+    const chunks = trimmed ? trimmed.split(/\n\n/) : []
+    if (chunks.length === 0) {
       dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: '' } })
       generate('open')
-    } else {
-      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
-      generate('continue', undefined, base)
+      return
     }
+    // Drop the last chunk — the generated paragraph we're replacing.
+    chunks.pop()
+    const prior = chunks[chunks.length - 1] || ''
+    if (prior.startsWith('> ')) {
+      // Last generation responded to a player action — keep the action, regen it.
+      chunks.pop()
+      const base = chunks.join('\n\n')
+      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
+      generate('action', prior.replace(/^> /, ''), base)
+      return
+    }
+    const base = chunks.join('\n\n')
+    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
+    if (!base.trim()) generate('open')
+    else generate('continue', undefined, base)
   }, [generate, state, isViewingActive])
 
   const deleteLast = useCallback(() => {
