@@ -198,19 +198,21 @@ function toRoman(n: number): string {
   return ROMAN[n - 1] || String(n)
 }
 
-// Serializable slice of state that gets persisted.
+// Serializable slice of state that gets persisted. `format` must be included:
+// omitting it makes the backend's pre-v5 migration treat every save as a legacy
+// session and wipe all chapter content.
 function toPersistable(s: State): Partial<GameState> {
   const {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
     lore, secs, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
-    effectiveCtxTokens,
+    effectiveCtxTokens, format,
   } = s
   return {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
     lore, secs, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
-    effectiveCtxTokens,
+    effectiveCtxTokens, format,
   }
 }
 

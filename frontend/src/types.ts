@@ -266,6 +266,7 @@ export function defaultState(): GameState {
     viewingChapterId: chapterId,
     archivedChapters: [],
     effectiveCtxTokens: 32000,
+    format: 'ai-rpg-nano-v5',
   }
 }
 

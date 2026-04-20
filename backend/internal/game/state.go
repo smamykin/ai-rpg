@@ -106,7 +106,10 @@ type Scenario struct {
 func (s *GameState) Migrate() bool {
 	changed := false
 
-	if s.Format != FormatV5 {
+	// Only wipe when the format is a known legacy string. Empty format means the
+	// caller (usually a frontend PUT that forgot to echo it) just didn't set it —
+	// treat it as current and preserve play progress.
+	if s.Format != "" && s.Format != FormatV5 {
 		// Legacy formats carried arbitrary play-progress fields we've since removed.
 		// encoding/json has already silently dropped them during Unmarshal; here we
 		// just reset the chapters structure so the session starts clean.
@@ -114,9 +117,10 @@ func (s *GameState) Migrate() bool {
 		s.ActiveChapterID = ""
 		s.ViewingChapterID = ""
 		s.ArchivedChapters = nil
-		if s.Format != "" {
-			log.Printf("migrated session %q from format %q to %q (play progress wiped, setup preserved)", s.SessionID, s.Format, FormatV5)
-		}
+		log.Printf("migrated session %q from format %q to %q (play progress wiped, setup preserved)", s.SessionID, s.Format, FormatV5)
+		s.Format = FormatV5
+		changed = true
+	} else if s.Format == "" {
 		s.Format = FormatV5
 		changed = true
 	}
