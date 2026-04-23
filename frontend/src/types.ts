@@ -61,6 +61,7 @@ export interface GameState {
   overview: string
   style: string
   cStyle: string
+  imgStyle?: string
   storyModel: string
   supportModel: string
   reasoningEffort?: string
@@ -286,6 +287,7 @@ export function defaultState(): GameState {
     overview: '',
     style: '1 paragraph',
     cStyle: '',
+    imgStyle: '',
     storyModel: '',
     supportModel: '',
     arc: '',

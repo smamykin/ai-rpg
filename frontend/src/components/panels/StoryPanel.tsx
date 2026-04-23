@@ -21,6 +21,7 @@ interface Props {
   onSwitch?: (panel: PanelId) => void
   style: string
   cStyle: string
+  imgStyle?: string
   diff: string
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
 }
@@ -30,7 +31,7 @@ export default function StoryPanel({
   galleryImages = [], onGenerateImage,
   story = '', overview, summariesText = '',
   onSwitch,
-  style, cStyle, diff, setField,
+  style, cStyle, imgStyle = '', diff, setField,
 }: Props) {
   const [sub, setSub] = useState<SubTab>('main')
   const enabledCount = lore.filter(l => l.enabled).length
@@ -69,6 +70,12 @@ export default function StoryPanel({
               <label className="lb">Custom Writing Style</label>
               <ModalTextField value={cStyle} onChange={v => setField('cStyle', v)} placeholder='e.g. "Lovecraftian horror"' lines={3} title="Custom writing style" />
               <div className="hint">Overrides default style when set.</div>
+            </div>
+
+            <div className="gr">
+              <label className="lb">Image Style</label>
+              <ModalTextField value={imgStyle} onChange={v => setField('imgStyle', v)} placeholder='e.g. "gritty oil painting, muted earth tones, chiaroscuro"' lines={3} title="Image style (art direction)" />
+              <div className="hint">Passed to the image-prompt AI as a binding art-direction constraint.</div>
             </div>
 
             <div className="gr">

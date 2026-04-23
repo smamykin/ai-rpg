@@ -184,6 +184,7 @@ export async function enhanceImagePrompt(
     recentStory?: string
     summaries?: string
     overview?: string
+    imageStyle?: string
     loreEntries?: { name: string; text: string }[]
   }
 ): Promise<string> {

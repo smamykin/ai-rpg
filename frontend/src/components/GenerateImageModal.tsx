@@ -9,6 +9,7 @@ interface GameContext {
   summaries: string         // joined chapter summaries
   lore: LoreEntry[]
   overview: string
+  imgStyle?: string
 }
 
 interface Props {
@@ -116,6 +117,7 @@ export default function GenerateImageModal({
 
   const buildContext = () => {
     const ctx: Parameters<typeof api.enhanceImagePrompt>[1] = {}
+    if (gameState.imgStyle && gameState.imgStyle.trim()) ctx.imageStyle = gameState.imgStyle.trim()
     if (ctxOverview && gameState.overview) ctx.overview = gameState.overview
     if (ctxSummaries && gameState.summaries) {
       ctx.summaries = gameState.summaries
@@ -209,6 +211,12 @@ export default function GenerateImageModal({
                 title="Image AI instructions"
               />
             </div>
+
+            {gameState.imgStyle && gameState.imgStyle.trim() && (
+              <div className="hint" style={{ marginBottom: '.4rem' }}>
+                <strong style={{ color: 'var(--ac)' }}>Image style:</strong> {gameState.imgStyle.trim()}
+              </div>
+            )}
 
             <div className="gm-ctx">
               <label className="lb" style={{ marginBottom: '.2rem' }}>Context to include</label>

@@ -24,6 +24,7 @@ type EnhancePromptContext struct {
 	RecentStory string              `json:"recentStory,omitempty"`
 	Summaries   string              `json:"summaries,omitempty"`
 	Overview    string              `json:"overview,omitempty"`
+	ImageStyle  string              `json:"imageStyle,omitempty"`
 	LoreEntries []LoreEntryContext  `json:"loreEntries,omitempty"`
 }
 
@@ -106,16 +107,20 @@ func (h *Handlers) EnhanceImagePrompt(w http.ResponseWriter, r *http.Request) {
 	state, _ := h.sessions.LoadCurrent()
 	model := h.resolveModel("imagePrompt", state)
 
-	systemPrompt := `You are an expert AI image prompt engineer for RPG illustration. Given the user's <instructions> plus optional context (<overview>, <story_summaries>, <recent_story>, <lore>), produce a single vivid image generation prompt.
+	systemPrompt := `You are an expert AI image prompt engineer for RPG illustration. Given the user's <instructions> plus optional context (<overview>, <story_summaries>, <recent_story>, <lore>, <image_style>), produce a single vivid image generation prompt.
 
 Rules:
 - Output ONLY the prompt text, nothing else.
 - Be descriptive: include lighting, mood, style, composition, colors, textures.
+- If <image_style> is provided, treat it as a binding art-direction constraint for every prompt (medium, palette, rendering, aesthetic).
 - Be creative and add artistic details that fit the RPG setting.
 - Keep the prompt under 200 words.`
 
 	var sb strings.Builder
 
+	if req.Context.ImageStyle != "" {
+		fmt.Fprintf(&sb, "<image_style>\n%s\n</image_style>\n\n", req.Context.ImageStyle)
+	}
 	if req.Context.Overview != "" {
 		fmt.Fprintf(&sb, "<overview>\n%s\n</overview>\n\n", req.Context.Overview)
 	}

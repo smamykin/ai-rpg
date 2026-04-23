@@ -22,6 +22,7 @@ type GameState struct {
 	Overview     string      `json:"overview"`
 	Style        string      `json:"style"`
 	CStyle       string      `json:"cStyle"`
+	ImgStyle     string      `json:"imgStyle,omitempty"`
 	StoryModel      string   `json:"storyModel"`
 	SupportModel    string   `json:"supportModel"`
 	ReasoningEffort string   `json:"reasoningEffort,omitempty"`

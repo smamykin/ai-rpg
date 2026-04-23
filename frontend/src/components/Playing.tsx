@@ -27,6 +27,7 @@ interface Props {
     overview: string
     style: string
     cStyle: string
+    imgStyle?: string
     diff: string
     arc: string
     storyModel: string
@@ -426,6 +427,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         summariesText={summariesAsText}
         style={state.style}
         cStyle={state.cStyle}
+        imgStyle={state.imgStyle}
         diff={state.diff}
         setField={setField}
         onSwitch={openPanel}
@@ -488,6 +490,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           summaries: summariesAsText,
           lore: state.lore,
           overview: state.overview,
+          imgStyle: state.imgStyle,
         }}
         defaultSource={genSource}
         defaultLoreEntryId={genLoreId}
