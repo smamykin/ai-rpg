@@ -54,7 +54,7 @@ export default function ActionInput({
   return (
     <>
       {showArc && (
-        <div className="ab">
+        <div className="ab" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
           <input
             type="text"
             value={arc}
@@ -62,6 +62,13 @@ export default function ActionInput({
             placeholder="Guide story toward..."
             style={{ fontSize: '.82rem', padding: '.4rem .6rem', background: 'var(--bg)', border: '1px solid var(--bd)', borderRadius: 8 }}
           />
+          <button
+            className="b bs"
+            onClick={() => onArcChange('')}
+            disabled={!arc}
+            title="Clear"
+            style={{ padding: '.35rem .55rem' }}
+          >&#x2715;</button>
         </div>
       )}
       <div className="ia">

@@ -19,6 +19,12 @@ function applyStoryFont(family: string, size: number) {
   root.setProperty('--story-size', `${size}rem`)
 }
 
+function applyEditorFont(family: string, size: number) {
+  const root = document.documentElement.style
+  root.setProperty('--editor-font', `'${family}'`)
+  root.setProperty('--editor-size', `${size}rem`)
+}
+
 function loadFont(name: string) {
   if (loadedFonts.has(name)) return
   loadedFonts.add(name)
@@ -36,7 +42,9 @@ function load(): DisplayPrefs {
       const prefs = { ...DISPLAY_DEFAULTS, ...parsed }
       applyTheme(prefs.theme)
       applyStoryFont(prefs.fontFamily, prefs.fontSize)
+      applyEditorFont(prefs.editorFontFamily, prefs.editorFontSize)
       loadFont(prefs.fontFamily)
+      loadFont(prefs.editorFontFamily)
       return prefs
     }
   } catch { /* ignore */ }
@@ -79,5 +87,25 @@ export function useDisplayPrefs() {
     })
   }, [])
 
-  return { prefs, setTheme, setFontFamily, setFontSize }
+  const setEditorFontFamily = useCallback((name: string) => {
+    loadFont(name)
+    setPrefs(prev => {
+      const next = { ...prev, editorFontFamily: name }
+      applyEditorFont(name, prev.editorFontSize)
+      persist(next)
+      return next
+    })
+  }, [])
+
+  const setEditorFontSize = useCallback((size: number) => {
+    const clamped = Number(Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, size)).toFixed(1))
+    setPrefs(prev => {
+      const next = { ...prev, editorFontSize: clamped }
+      applyEditorFont(prev.editorFontFamily, clamped)
+      persist(next)
+      return next
+    })
+  }, [])
+
+  return { prefs, setTheme, setFontFamily, setFontSize, setEditorFontFamily, setEditorFontSize }
 }

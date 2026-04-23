@@ -6,7 +6,7 @@ import type { DisplayPrefs } from '../../display'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
 import ModelPicker from '../ModelPicker'
-import ExpandableTextarea from '../ExpandableTextarea'
+import ModalTextField from '../ModalTextField'
 import { TTS_MODELS, TTS_VOICES, getModelMeta, getModelSettings } from '../../constants/tts'
 import * as apiClient from '../../api'
 
@@ -33,6 +33,8 @@ interface Props {
   onSetTheme: (id: string) => void
   onSetFontFamily: (name: string) => void
   onSetFontSize: (size: number) => void
+  onSetEditorFontFamily: (name: string) => void
+  onSetEditorFontSize: (size: number) => void
   tts: TTSSettings
   dispatch: React.Dispatch<any>
   ttsPlaying: boolean
@@ -43,12 +45,13 @@ export default function SettingsPanel({
   show, onClose, onSwitch, visibleTabs,
   storyModel, supportModel, reasoningEffort, modelRoles,
   effectiveCtxTokens, setField,
-  displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize,
+  displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize, onSetEditorFontFamily, onSetEditorFontSize,
   tts, dispatch, ttsPlaying, onStopTTS,
 }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelsErr, setModelsErr] = useState('')
+  const [ctxDraft, setCtxDraft] = useState<string | null>(null)
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true)
@@ -138,34 +141,6 @@ export default function SettingsPanel({
           <div className="hint">Default fallback for all non-story tasks. Individual tasks below can override.</div>
         </div>
 
-        <div className="gr">
-          <label className="lb">Reasoning effort</label>
-          <select
-            value={reasoningEffort || 'none'}
-            onChange={e => setField('reasoningEffort', e.target.value)}
-          >
-            <option value="none">Off</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="xhigh">Extra high</option>
-          </select>
-          <div className="hint">For thinking models (gpt-5, o1, deepseek-r1, claude :thinking variants). Reasoning tokens count as output tokens.</div>
-        </div>
-
-        <div className="gr">
-          <label className="lb">Effective context ({(effectiveCtxTokens / 1000).toFixed(0)}k / {(ctxMax / 1000).toFixed(0)}k supported)</label>
-          <input
-            type="range"
-            min={8000}
-            max={ctxMax}
-            step={1000}
-            value={Math.min(effectiveCtxTokens, ctxMax)}
-            onChange={e => setField('effectiveCtxTokens', Number(e.target.value))}
-          />
-          <div className="hint">Token budget for each prompt. The app warns at 65% and blocks generation at 90%.</div>
-        </div>
-
         <details className="adv">
           <summary>Advanced &mdash; per-task models</summary>
           <div className="hint" style={{ marginBottom: '.5rem' }}>
@@ -193,6 +168,58 @@ export default function SettingsPanel({
             )
           })}
         </details>
+
+        <div className="gr">
+          <label className="lb">Reasoning effort</label>
+          <select
+            value={reasoningEffort || 'none'}
+            onChange={e => setField('reasoningEffort', e.target.value)}
+          >
+            <option value="none">Off</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="xhigh">Extra high</option>
+          </select>
+          <div className="hint">For thinking models (gpt-5, o1, deepseek-r1, claude :thinking variants). Reasoning tokens count as output tokens.</div>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Effective context ({(effectiveCtxTokens / 1000).toFixed(0)}k / {(ctxMax / 1000).toFixed(0)}k supported)</label>
+          <input
+            type="range"
+            min={8000}
+            max={ctxMax}
+            step={1000}
+            value={Math.min(effectiveCtxTokens, ctxMax)}
+            onChange={e => setField('effectiveCtxTokens', Number(e.target.value))}
+          />
+          <div className="fss" style={{ marginTop: '.35rem' }}>
+            <input
+              type="number"
+              min={8000}
+              max={ctxMax}
+              step={1000}
+              value={ctxDraft !== null ? ctxDraft : Math.min(effectiveCtxTokens, ctxMax)}
+              onChange={e => setCtxDraft(e.target.value)}
+              onBlur={() => {
+                if (ctxDraft === null) return
+                const n = Number(ctxDraft)
+                if (Number.isFinite(n) && ctxDraft.trim() !== '') {
+                  setField('effectiveCtxTokens', Math.min(ctxMax, Math.max(8000, n)))
+                }
+                setCtxDraft(null)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                else if (e.key === 'Escape') { setCtxDraft(null); (e.target as HTMLInputElement).blur() }
+              }}
+              style={{ width: '90px' }}
+            />
+            <span className="hint" style={{ margin: 0 }}>tokens</span>
+          </div>
+          <div className="hint">Token budget for each prompt. The app warns at 65% and blocks generation at 90%.</div>
+        </div>
 
         <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
           <label className="lb" style={{ marginBottom: '.5rem' }}>Text-to-Speech</label>
@@ -242,11 +269,11 @@ export default function SettingsPanel({
         {ttsMeta.supportsInstructions && (
           <div className="gr">
             <label className="lb">Instructions</label>
-            <ExpandableTextarea
+            <ModalTextField
               value={ttsModelSettings.instructions || ''}
               onChange={v => updateTTSSetting('instructions', v)}
               placeholder='e.g. "read in a dramatic whisper, like an ancient storyteller"'
-              rows={2}
+              lines={2}
               title="TTS instructions"
             />
             <div className="hint">Natural-language voice direction.</div>
@@ -317,6 +344,40 @@ export default function SettingsPanel({
               className="b bs"
               onClick={() => onSetFontSize(displayPrefs.fontSize + FONT_SIZE_STEP)}
               disabled={displayPrefs.fontSize >= FONT_SIZE_MAX}
+            >+</button>
+          </div>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Editor Font</label>
+          <select value={displayPrefs.editorFontFamily} onChange={e => onSetEditorFontFamily(e.target.value)}>
+            {FONTS.map(f => (
+              <option key={f.name} value={f.name}>{f.name} ({f.category})</option>
+            ))}
+          </select>
+          <div className="hint">Used by the pop-up text editor.</div>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Editor Font Size</label>
+          <div className="fss">
+            <button
+              className="b bs"
+              onClick={() => onSetEditorFontSize(displayPrefs.editorFontSize - FONT_SIZE_STEP)}
+              disabled={displayPrefs.editorFontSize <= FONT_SIZE_MIN}
+            >&minus;</button>
+            <input
+              type="number"
+              value={displayPrefs.editorFontSize}
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
+              step={FONT_SIZE_STEP}
+              onChange={e => onSetEditorFontSize(parseFloat(e.target.value) || FONT_SIZE_MIN)}
+            />
+            <button
+              className="b bs"
+              onClick={() => onSetEditorFontSize(displayPrefs.editorFontSize + FONT_SIZE_STEP)}
+              disabled={displayPrefs.editorFontSize >= FONT_SIZE_MAX}
             >+</button>
           </div>
         </div>

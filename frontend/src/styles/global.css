@@ -12,6 +12,8 @@
   --crt: #4f8a5a;
   --story-font: 'Crimson Pro';
   --story-size: 1.1rem;
+  --editor-font: 'Crimson Pro';
+  --editor-size: 1rem;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -474,7 +476,7 @@ select {
 }
 
 /* Advanced collapsible in AI panel */
-.adv { margin-top: .5rem; border-top: 1px solid var(--bd); padding-top: .75rem; }
+.adv { margin-top: .5rem; margin-bottom: .75rem; border-top: 1px solid var(--bd); padding-top: .75rem; }
 .adv > summary { cursor: pointer; font-size: .8rem; color: var(--mt); font-weight: 500; padding: .25rem 0; user-select: none; list-style: none; }
 .adv > summary::-webkit-details-marker { display: none; }
 .adv > summary::before { content: "▸"; display: inline-block; margin-right: .4rem; transition: transform .15s; font-size: .7rem; }
@@ -526,6 +528,39 @@ select {
 }
 .exta-btn:hover { opacity: 1; color: var(--ac); background: var(--sf2); }
 
+/* Modal text field — clickable preview that opens EditorModal (used in narrow side panels) */
+.mtf {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  width: 100%;
+  background: var(--sf);
+  color: var(--tx);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: .9rem;
+  padding: .65rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  min-height: calc(.9rem * 1.45 * var(--mtf-lines, 2) + 1.3rem + 2px);
+}
+.mtf:hover { border-color: var(--ac2); }
+.mtf-v {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: var(--mtf-lines, 2);
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mtf-e .mtf-v { color: var(--mt); font-style: italic; }
+.mtf-i { color: var(--mt); font-size: .9rem; line-height: 1.45; flex-shrink: 0; }
+.mtf:hover .mtf-i { color: var(--ac); }
+
 /* Editor modal (scalable textarea editor) */
 .emd {
   position: fixed;
@@ -556,8 +591,8 @@ select {
 .emd-h span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .emd-ta {
   flex: 1;
-  font-family: 'Crimson Pro', Georgia, serif;
-  font-size: 1rem;
+  font-family: var(--editor-font, 'Crimson Pro'), Georgia, serif;
+  font-size: var(--editor-size, 1rem);
   line-height: 1.55;
   padding: .75rem;
   min-height: 0;

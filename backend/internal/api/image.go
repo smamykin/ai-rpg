@@ -106,7 +106,7 @@ func (h *Handlers) EnhanceImagePrompt(w http.ResponseWriter, r *http.Request) {
 	state, _ := h.sessions.LoadCurrent()
 	model := h.resolveModel("imagePrompt", state)
 
-	systemPrompt := `You are an expert AI image prompt engineer for RPG illustration. Create a vivid, detailed image generation prompt based on the provided context and instructions.
+	systemPrompt := `You are an expert AI image prompt engineer for RPG illustration. Given the user's <instructions> plus optional context (<overview>, <story_summaries>, <recent_story>, <lore>), produce a single vivid image generation prompt.
 
 Rules:
 - Output ONLY the prompt text, nothing else.
@@ -115,25 +115,25 @@ Rules:
 - Keep the prompt under 200 words.`
 
 	var sb strings.Builder
-	sb.WriteString("Create an image prompt based on these instructions:\n")
-	sb.WriteString(req.Instructions)
-	sb.WriteString("\n")
 
 	if req.Context.Overview != "" {
-		fmt.Fprintf(&sb, "\n--- Adventure Overview ---\n%s\n", req.Context.Overview)
+		fmt.Fprintf(&sb, "<overview>\n%s\n</overview>\n\n", req.Context.Overview)
 	}
 	if req.Context.Summaries != "" {
-		fmt.Fprintf(&sb, "\n--- Story Summaries ---\n%s\n", req.Context.Summaries)
+		fmt.Fprintf(&sb, "<story_summaries>\n%s\n</story_summaries>\n\n", req.Context.Summaries)
 	}
 	if req.Context.RecentStory != "" {
-		fmt.Fprintf(&sb, "\n--- Recent Story ---\n%s\n", req.Context.RecentStory)
+		fmt.Fprintf(&sb, "<recent_story>\n%s\n</recent_story>\n\n", req.Context.RecentStory)
 	}
 	if len(req.Context.LoreEntries) > 0 {
-		sb.WriteString("\n--- Lore ---\n")
+		sb.WriteString("<lore>\n")
 		for _, l := range req.Context.LoreEntries {
 			fmt.Fprintf(&sb, "**%s**: %s\n", l.Name, l.Text)
 		}
+		sb.WriteString("</lore>\n\n")
 	}
+
+	fmt.Fprintf(&sb, "<instructions>\n%s\n</instructions>\n", strings.TrimSpace(req.Instructions))
 
 	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), 500, "")
 	if err != nil {

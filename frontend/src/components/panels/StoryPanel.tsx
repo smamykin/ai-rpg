@@ -4,7 +4,7 @@ import { STYLES } from '../../types'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
 import LoreEditor from '../LoreEditor'
-import ExpandableTextarea from '../ExpandableTextarea'
+import ModalTextField from '../ModalTextField'
 
 type SubTab = 'main' | 'lore'
 
@@ -54,7 +54,7 @@ export default function StoryPanel({
           <>
             <div className="gr">
               <label className="lb">Adventure Overview</label>
-              <ExpandableTextarea value={overview} onChange={v => setField('overview', v)} placeholder="What it's about..." rows={3} title="Adventure overview" />
+              <ModalTextField value={overview} onChange={v => setField('overview', v)} placeholder="What it's about..." lines={3} title="Adventure overview" />
             </div>
 
             <div className="gr">
@@ -67,7 +67,7 @@ export default function StoryPanel({
 
             <div className="gr">
               <label className="lb">Custom Writing Style</label>
-              <ExpandableTextarea value={cStyle} onChange={v => setField('cStyle', v)} placeholder='e.g. "Lovecraftian horror"' rows={3} title="Custom writing style" />
+              <ModalTextField value={cStyle} onChange={v => setField('cStyle', v)} placeholder='e.g. "Lovecraftian horror"' lines={3} title="Custom writing style" />
               <div className="hint">Overrides default style when set.</div>
             </div>
 

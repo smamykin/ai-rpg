@@ -429,6 +429,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onSetTheme={dp.setTheme}
         onSetFontFamily={dp.setFontFamily}
         onSetFontSize={dp.setFontSize}
+        onSetEditorFontFamily={dp.setEditorFontFamily}
+        onSetEditorFontSize={dp.setEditorFontSize}
         tts={state.tts}
         dispatch={dispatch}
         ttsPlaying={tts.isPlaying || tts.isLoading}

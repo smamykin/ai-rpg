@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ExtraAction {
   label: string
@@ -41,7 +42,7 @@ export default function EditorModal({ title, value, placeholder, onSave, onClose
     return () => window.removeEventListener('keydown', onKey)
   }, [draft, onSave, onClose])
 
-  return (
+  return createPortal(
     <>
       <div className="mov" onClick={onClose} />
       <div className="emd" onClick={e => e.stopPropagation()}>
@@ -70,6 +71,7 @@ export default function EditorModal({ title, value, placeholder, onSave, onClose
           <button className="b bs ba" onClick={() => onSave(draft)}>Save</button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   )
 }

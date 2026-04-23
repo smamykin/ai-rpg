@@ -22,7 +22,7 @@ export default function GlobalMenu({ state, dispatch, setField }: Props) {
         onClick={() => setShow(s => !s)}
         title="Settings"
         aria-label="Settings"
-      >&#x2699;</button>
+      >&#x2630;</button>
       <SettingsPanel
         show={show}
         onClose={() => setShow(false)}
@@ -40,6 +40,8 @@ export default function GlobalMenu({ state, dispatch, setField }: Props) {
         onSetTheme={dp.setTheme}
         onSetFontFamily={dp.setFontFamily}
         onSetFontSize={dp.setFontSize}
+        onSetEditorFontFamily={dp.setEditorFontFamily}
+        onSetEditorFontSize={dp.setEditorFontSize}
       />
     </>
   )

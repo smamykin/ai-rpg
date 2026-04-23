@@ -26,8 +26,8 @@ async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
   if (res.status === 409) throw new SessionMismatchError()
   if (res.status === 404 && url === '/state') throw new NoCurrentSessionError()
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+    const text = (await res.text().catch(() => '')).trim().slice(0, 300)
+    throw new Error(text || `HTTP ${res.status}`)
   }
   return res.json()
 }
@@ -254,8 +254,8 @@ export async function tts(req: TTSRequest, signal?: AbortSignal): Promise<Blob> 
     signal,
   })
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+    const text = (await res.text().catch(() => '')).trim().slice(0, 300)
+    throw new Error(text || `HTTP ${res.status}`)
   }
   return res.blob()
 }
@@ -298,8 +298,8 @@ export function generate(
   })
     .then(async (res) => {
       if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        callbacks.onError(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+        const text = (await res.text().catch(() => '')).trim().slice(0, 300)
+        callbacks.onError(text || `HTTP ${res.status}`)
         return
       }
 

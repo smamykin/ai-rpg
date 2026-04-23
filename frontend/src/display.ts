@@ -37,6 +37,78 @@ export const THEMES: Theme[] = [
       '--tx': '#e8d8d4', '--mt': '#907068', '--ac': '#e06040', '--ac2': '#b04430', '--dng': '#e04848',
     },
   },
+  {
+    id: 'noir',
+    name: 'Noir',
+    vars: {
+      '--bg': '#030303', '--sf': '#0a0a0a', '--sf2': '#121212', '--bd': '#1f1f1f',
+      '--tx': '#d8d4d0', '--mt': '#6a6660', '--ac': '#8b2635', '--ac2': '#5c1820', '--dng': '#c0392b',
+    },
+  },
+  {
+    id: 'arcane',
+    name: 'Arcane',
+    vars: {
+      '--bg': '#0b0814', '--sf': '#130e20', '--sf2': '#1b142c', '--bd': '#2c2044',
+      '--tx': '#e2d8f0', '--mt': '#8878a0', '--ac': '#b57aff', '--ac2': '#8a4fd0', '--dng': '#d94466',
+    },
+  },
+  {
+    id: 'frost',
+    name: 'Frost',
+    vars: {
+      '--bg': '#080c10', '--sf': '#0e1620', '--sf2': '#15202e', '--bd': '#223244',
+      '--tx': '#dce8f0', '--mt': '#7a8ea0', '--ac': '#6ad0e8', '--ac2': '#3c94b0', '--dng': '#e06060',
+    },
+  },
+  {
+    id: 'rust',
+    name: 'Rust',
+    vars: {
+      '--bg': '#0e0a06', '--sf': '#18120a', '--sf2': '#221a10', '--bd': '#3a2a18',
+      '--tx': '#ecdcc0', '--mt': '#908070', '--ac': '#d87c2a', '--ac2': '#a25618', '--dng': '#c0392b',
+    },
+  },
+  {
+    id: 'bloodmoon',
+    name: 'Bloodmoon',
+    vars: {
+      '--bg': '#0a0404', '--sf': '#150808', '--sf2': '#1e0c0c', '--bd': '#381414',
+      '--tx': '#e8d0cc', '--mt': '#906060', '--ac': '#d02030', '--ac2': '#8a0e18', '--dng': '#ff4848',
+    },
+  },
+  {
+    id: 'abyss',
+    name: 'Abyss',
+    vars: {
+      '--bg': '#050c0e', '--sf': '#0a1518', '--sf2': '#0f2024', '--bd': '#183038',
+      '--tx': '#d0e4e8', '--mt': '#6a8890', '--ac': '#3fb8b0', '--ac2': '#1e8078', '--dng': '#e85858',
+    },
+  },
+  {
+    id: 'wasteland',
+    name: 'Wasteland',
+    vars: {
+      '--bg': '#0a0c06', '--sf': '#12160a', '--sf2': '#1a2010', '--bd': '#2a321c',
+      '--tx': '#dce4c8', '--mt': '#808870', '--ac': '#a8cc30', '--ac2': '#708818', '--dng': '#d94030',
+    },
+  },
+  {
+    id: 'parchment',
+    name: 'Parchment',
+    vars: {
+      '--bg': '#f0e8d4', '--sf': '#e4dac0', '--sf2': '#d8ccaa', '--bd': '#b8a67c',
+      '--tx': '#2c2418', '--mt': '#6c5e44', '--ac': '#8a4a18', '--ac2': '#5c3010', '--dng': '#a02828',
+    },
+  },
+  {
+    id: 'void',
+    name: 'Void',
+    vars: {
+      '--bg': '#000000', '--sf': '#040404', '--sf2': '#080808', '--bd': '#141414',
+      '--tx': '#b8b8b8', '--mt': '#555555', '--ac': '#707070', '--ac2': '#4a4a4a', '--dng': '#8a2020',
+    },
+  },
 ]
 
 export interface StoryFont {
@@ -64,12 +136,16 @@ export interface DisplayPrefs {
   theme: string
   fontFamily: string
   fontSize: number
+  editorFontFamily: string
+  editorFontSize: number
 }
 
 export const DISPLAY_DEFAULTS: DisplayPrefs = {
   theme: 'gold',
   fontFamily: 'Crimson Pro',
   fontSize: 1.1,
+  editorFontFamily: 'Crimson Pro',
+  editorFontSize: 1.0,
 }
 
 export const FONT_SIZE_MIN = 0.8

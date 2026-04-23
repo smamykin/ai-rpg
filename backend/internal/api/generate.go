@@ -384,8 +384,8 @@ func (h *Handlers) Transform(w http.ResponseWriter, r *http.Request) {
 	}
 	model := h.resolveSupportModel(state)
 
-	system := "You are a text editor for a narrative story. Return ONLY the corrected or transformed text. Do not add explanations, notes, or commentary. Preserve the original tone and style."
-	user := fmt.Sprintf("Instruction: %s\n\nText:\n%s", req.Instruction, req.Text)
+	system := "You are a text editor for a narrative story. Return ONLY the transformed text — no preamble, no commentary, no wrapping quotes. Preserve the original tone and style. Do not extend or shorten the passage beyond what the instruction requires."
+	user := fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<text>\n%s\n</text>", strings.TrimSpace(req.Instruction), req.Text)
 
 	result, err := h.client.Complete(r.Context(), model, system, user, 2000, "")
 	if err != nil {

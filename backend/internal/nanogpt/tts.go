@@ -44,7 +44,7 @@ func (c *Client) TextToSpeech(ctx context.Context, req TTSRequest) ([]byte, stri
 	ttsClient := &http.Client{Timeout: 120 * time.Second}
 	resp, err := ttsClient.Do(httpReq)
 	if err != nil {
-		return nil, "", fmt.Errorf("do request: %w", err)
+		return nil, "", netErr("NanoGPT", err)
 	}
 	defer resp.Body.Close()
 
@@ -81,7 +81,7 @@ func (c *Client) TextToSpeech(ctx context.Context, req TTSRequest) ([]byte, stri
 	}
 	audioResp, err := ttsClient.Do(audioReq)
 	if err != nil {
-		return nil, "", fmt.Errorf("fetch audio: %w", err)
+		return nil, "", netErr("audio CDN", err)
 	}
 	defer audioResp.Body.Close()
 

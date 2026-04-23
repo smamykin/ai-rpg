@@ -34,6 +34,32 @@ func NewClient(apiKey string) *Client {
 	}
 }
 
+// netErr turns a low-level transport failure into a message aimed at the end
+// user. Go's default net error strings ("dial tcp 1.2.3.4:443: i/o timeout")
+// surface directly in the UI otherwise and are unhelpful.
+func netErr(host string, err error) error {
+	if err == nil {
+		return nil
+	}
+	s := err.Error()
+	var reason string
+	switch {
+	case strings.Contains(s, "no such host"):
+		reason = "DNS lookup failed"
+	case strings.Contains(s, "i/o timeout"), strings.Contains(s, "deadline exceeded"), strings.Contains(s, "Client.Timeout"):
+		reason = "connection timed out"
+	case strings.Contains(s, "connection refused"):
+		reason = "connection refused"
+	case strings.Contains(s, "connection reset"):
+		reason = "connection reset"
+	case strings.Contains(s, "tls:"), strings.Contains(s, "x509:"):
+		reason = "TLS handshake failed"
+	default:
+		reason = "network error"
+	}
+	return fmt.Errorf("can't reach %s (%s). Check your internet connection or try again in a moment", host, reason)
+}
+
 type ChatRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
@@ -140,7 +166,7 @@ func (c *Client) GenerateImage(ctx context.Context, model, prompt string, n, wid
 	imgClient := &http.Client{Timeout: 120 * time.Second}
 	resp, err := imgClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
+		return nil, netErr("NanoGPT", err)
 	}
 	defer resp.Body.Close()
 
@@ -170,7 +196,7 @@ func (c *Client) FetchImageModels(ctx context.Context) ([]ImageModel, error) {
 
 	resp, err := c.HTTPClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
+		return nil, netErr("NanoGPT", err)
 	}
 	defer resp.Body.Close()
 
@@ -230,7 +256,7 @@ func (c *Client) Complete(ctx context.Context, model, system, user string, maxTo
 
 	resp, err := c.HTTPClient.Do(httpReq)
 	if err != nil {
-		return "", fmt.Errorf("do request: %w", err)
+		return "", netErr("NanoGPT", err)
 	}
 	defer resp.Body.Close()
 
@@ -287,7 +313,7 @@ func (c *Client) CompleteStream(ctx context.Context, model, system, user string,
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		return "", fmt.Errorf("do request: %w", err)
+		return "", netErr("NanoGPT", err)
 	}
 	defer resp.Body.Close()
 
@@ -365,7 +391,7 @@ func (c *Client) FetchModels(ctx context.Context) ([]ModelResponse, error) {
 
 	resp, err := c.HTTPClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
+		return nil, netErr("NanoGPT", err)
 	}
 	defer resp.Body.Close()
 

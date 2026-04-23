@@ -5,7 +5,7 @@ import * as api from '../api'
 import type { LoreLength, LoreMode } from '../api'
 import Lightbox from './Lightbox'
 import SuggestNameButton from './SuggestNameButton'
-import ExpandableTextarea from './ExpandableTextarea'
+import ModalTextField from './ModalTextField'
 
 const TAG_COLORS: Record<string, string> = {
   world: 'var(--ac)',
@@ -204,12 +204,12 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
 
       <div className="gr">
         <label className="lb">Content</label>
-        <ExpandableTextarea
+        <ModalTextField
           className="mt"
           value={selected.text}
           onChange={v => update(selected.id, { text: v })}
           placeholder="Lore content..."
-          rows={6}
+          lines={6}
           title={selected.name || 'Lore content'}
         />
         {aiContext && (
@@ -250,12 +250,12 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
                 </div>
                 <div className="gr" style={{ marginBottom: '.5rem' }}>
                   <label className="lb">Instructions (optional)</label>
-                  <ExpandableTextarea
+                  <ModalTextField
                     className="mt"
                     value={aiInstructions}
                     onChange={v => setAiInstructions(v)}
                     placeholder="e.g. focus on appearance, describe relationships..."
-                    rows={2}
+                    lines={2}
                     title="Lore AI instructions"
                   />
                 </div>
