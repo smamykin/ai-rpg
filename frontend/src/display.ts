@@ -138,6 +138,8 @@ export interface DisplayPrefs {
   fontSize: number
   editorFontFamily: string
   editorFontSize: number
+  ambientBg: boolean
+  ambientBlur: number
 }
 
 export const DISPLAY_DEFAULTS: DisplayPrefs = {
@@ -146,7 +148,12 @@ export const DISPLAY_DEFAULTS: DisplayPrefs = {
   fontSize: 1.1,
   editorFontFamily: 'Crimson Pro',
   editorFontSize: 1.0,
+  ambientBg: true,
+  ambientBlur: 26,
 }
+
+export const AMBIENT_BLUR_MIN = 0
+export const AMBIENT_BLUR_MAX = 60
 
 export const FONT_SIZE_MIN = 0.8
 export const FONT_SIZE_MAX = 2.0

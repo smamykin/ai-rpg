@@ -353,7 +353,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   return (
     <div className="R" ref={rootRef}>
       {/* Ambient background */}
-      {bgImage && (
+      {dp.prefs.ambientBg && bgImage && (
         <div className="ambi" aria-hidden>
           <img src={bgImage.url} alt="" />
         </div>
@@ -475,6 +475,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onSetFontSize={dp.setFontSize}
         onSetEditorFontFamily={dp.setEditorFontFamily}
         onSetEditorFontSize={dp.setEditorFontSize}
+        onSetAmbientBg={dp.setAmbientBg}
+        onSetAmbientBlur={dp.setAmbientBlur}
         tts={state.tts}
         dispatch={dispatch}
         ttsPlaying={tts.isPlaying || tts.isLoading}

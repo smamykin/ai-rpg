@@ -42,6 +42,8 @@ export default function GlobalMenu({ state, dispatch, setField }: Props) {
         onSetFontSize={dp.setFontSize}
         onSetEditorFontFamily={dp.setEditorFontFamily}
         onSetEditorFontSize={dp.setEditorFontSize}
+        onSetAmbientBg={dp.setAmbientBg}
+        onSetAmbientBlur={dp.setAmbientBlur}
       />
     </>
   )

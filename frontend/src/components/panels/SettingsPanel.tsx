@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { GameState, ModelInfo, ModelRole, TTSSettings } from '../../types'
 import { MODEL_ROLES } from '../../types'
-import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP } from '../../display'
+import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, AMBIENT_BLUR_MIN, AMBIENT_BLUR_MAX } from '../../display'
 import type { DisplayPrefs } from '../../display'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
@@ -35,6 +35,8 @@ interface Props {
   onSetFontSize: (size: number) => void
   onSetEditorFontFamily: (name: string) => void
   onSetEditorFontSize: (size: number) => void
+  onSetAmbientBg: (on: boolean) => void
+  onSetAmbientBlur: (px: number) => void
   tts: TTSSettings
   dispatch: React.Dispatch<any>
   ttsPlaying: boolean
@@ -45,7 +47,7 @@ export default function SettingsPanel({
   show, onClose, onSwitch, visibleTabs,
   storyModel, supportModel, reasoningEffort, modelRoles,
   effectiveCtxTokens, setField,
-  displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize, onSetEditorFontFamily, onSetEditorFontSize,
+  displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize, onSetEditorFontFamily, onSetEditorFontSize, onSetAmbientBg, onSetAmbientBlur,
   tts, dispatch, ttsPlaying, onStopTTS,
 }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -294,6 +296,36 @@ export default function SettingsPanel({
         <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
           <label className="lb" style={{ marginBottom: '.5rem' }}>Display</label>
         </div>
+
+        <div className="gr">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={displayPrefs.ambientBg}
+              onChange={e => onSetAmbientBg(e.target.checked)}
+              style={{ width: '18px', height: '18px' }}
+            />
+            <span>Ambient image background</span>
+          </label>
+          <div className="hint">Blurred pinned/latest image behind the story.</div>
+        </div>
+
+        {displayPrefs.ambientBg && (
+          <div className="gr">
+            <label className="lb">Blur Strength</label>
+            <div className="gm-sl">
+              <input
+                type="range"
+                min={AMBIENT_BLUR_MIN}
+                max={AMBIENT_BLUR_MAX}
+                step={1}
+                value={displayPrefs.ambientBlur}
+                onChange={e => onSetAmbientBlur(parseInt(e.target.value, 10))}
+              />
+              <span className="gm-sv">{displayPrefs.ambientBlur}px</span>
+            </div>
+          </div>
+        )}
 
         <div className="gr">
           <label className="lb">Theme</label>

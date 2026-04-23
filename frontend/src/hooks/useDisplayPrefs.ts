@@ -25,6 +25,10 @@ function applyEditorFont(family: string, size: number) {
   root.setProperty('--editor-size', `${size}rem`)
 }
 
+function applyAmbientBlur(px: number) {
+  document.documentElement.style.setProperty('--ambi-blur', `${px}px`)
+}
+
 function loadFont(name: string) {
   if (loadedFonts.has(name)) return
   loadedFonts.add(name)
@@ -43,6 +47,7 @@ function load(): DisplayPrefs {
       applyTheme(prefs.theme)
       applyStoryFont(prefs.fontFamily, prefs.fontSize)
       applyEditorFont(prefs.editorFontFamily, prefs.editorFontSize)
+      applyAmbientBlur(prefs.ambientBlur)
       loadFont(prefs.fontFamily)
       loadFont(prefs.editorFontFamily)
       return prefs
@@ -107,5 +112,22 @@ export function useDisplayPrefs() {
     })
   }, [])
 
-  return { prefs, setTheme, setFontFamily, setFontSize, setEditorFontFamily, setEditorFontSize }
+  const setAmbientBg = useCallback((on: boolean) => {
+    setPrefs(prev => {
+      const next = { ...prev, ambientBg: on }
+      persist(next)
+      return next
+    })
+  }, [])
+
+  const setAmbientBlur = useCallback((px: number) => {
+    setPrefs(prev => {
+      const next = { ...prev, ambientBlur: px }
+      applyAmbientBlur(px)
+      persist(next)
+      return next
+    })
+  }, [])
+
+  return { prefs, setTheme, setFontFamily, setFontSize, setEditorFontFamily, setEditorFontSize, setAmbientBg, setAmbientBlur }
 }
