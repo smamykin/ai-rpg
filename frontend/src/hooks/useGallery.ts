@@ -3,7 +3,21 @@ import type { GalleryImage } from '../types'
 
 const STORAGE_KEY_V1 = 'ai-rpg-gallery'
 const STORAGE_KEY = 'ai-rpg-gallery-v2'
+const BG_KEY = 'ai-rpg-bg'
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+function loadBgMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(BG_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function persistBgMap(m: Record<string, string>) {
+  try { localStorage.setItem(BG_KEY, JSON.stringify(m)) } catch { /* ignore */ }
+}
 
 function load(): GalleryImage[] {
   // v2 path
@@ -44,6 +58,22 @@ function persist(imgs: GalleryImage[]) {
 
 export function useGallery() {
   const [images, setImages] = useState<GalleryImage[]>(load)
+  const [bgMap, setBgMap] = useState<Record<string, string>>(loadBgMap)
+
+  const setBgImageId = useCallback((sessionId: string, id: string | null) => {
+    setBgMap(prev => {
+      const next = { ...prev }
+      if (id) next[sessionId] = id
+      else delete next[sessionId]
+      persistBgMap(next)
+      return next
+    })
+  }, [])
+
+  const getBgImageId = useCallback(
+    (sessionId: string) => bgMap[sessionId],
+    [bgMap]
+  )
 
   const addImages = useCallback((newImgs: GalleryImage[], sessionId?: string) => {
     const stamped = sessionId
@@ -74,5 +104,5 @@ export function useGallery() {
     [images]
   )
 
-  return { images, addImages, removeImage, clearAll, getForLore, count: images.length }
+  return { images, addImages, removeImage, clearAll, getForLore, setBgImageId, getBgImageId, count: images.length }
 }

@@ -10,6 +10,7 @@ import PromptPanel from './panels/PromptPanel'
 import GenerateImageModal from './GenerateImageModal'
 import SaveAsScenarioModal from './SaveAsScenarioModal'
 import RewindModal from './RewindModal'
+import Lightbox from './Lightbox'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
 import type { Chapter, GameState, GalleryImage, TTSSettings, Turn } from '../types'
@@ -108,7 +109,23 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [showGenModal, setShowGenModal] = useState(false)
   const [genSource, setGenSource] = useState<'story' | 'lore'>('story')
   const [genLoreId, setGenLoreId] = useState<string | undefined>()
+  const [storyLbIdx, setStoryLbIdx] = useState<number | null>(null)
   const gallery = useGallery()
+
+  const sessionStoryImgs = useMemo(
+    () => gallery.images.filter(i => i.source === 'story' && i.sessionId === state.sessionId),
+    [gallery.images, state.sessionId]
+  )
+  const pinnedBgId = gallery.getBgImageId(state.sessionId) || null
+  const bgImage = useMemo(() => {
+    if (pinnedBgId) return gallery.images.find(i => i.id === pinnedBgId) || null
+    return sessionStoryImgs[0] || null
+  }, [pinnedBgId, gallery.images, sessionStoryImgs])
+
+  const openStoryLightbox = (imgId: string) => {
+    const idx = sessionStoryImgs.findIndex(i => i.id === imgId)
+    if (idx >= 0) setStoryLbIdx(idx)
+  }
 
   // Toasts
   const { toasts, addToast, removeToast } = useToast()
@@ -236,7 +253,14 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   }
 
   const handleImagesGenerated = (imgs: GalleryImage[]) => {
-    gallery.addImages(imgs, state.sessionId)
+    const chapter = computed.activeChapter
+    const lastTurn = chapter?.turns[chapter.turns.length - 1]
+    const stamped = imgs.map(i =>
+      i.source === 'story' && lastTurn
+        ? { ...i, turnId: lastTurn.id, chapterId: chapter!.id }
+        : i
+    )
+    gallery.addImages(stamped, state.sessionId)
   }
 
   const promptTokens = useMemo(() => estimatePromptTokens(state), [state.chapters, state.lore, state.overview, state.secs, state.style])
@@ -327,6 +351,13 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   return (
     <div className="R" ref={rootRef}>
+      {/* Ambient background */}
+      {bgImage && (
+        <div className="ambi" aria-hidden>
+          <img src={bgImage.url} alt="" />
+        </div>
+      )}
+
       {/* Header */}
       <div className="hd">
         <button
@@ -408,6 +439,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onDelete={gallery.removeImage}
         onClearAll={gallery.clearAll}
         onSwitch={openPanel}
+        pinnedBgId={gallery.getBgImageId(state.sessionId) || null}
+        onSetBg={(id) => gallery.setBgImageId(state.sessionId, id)}
       />
 
       <TrackingPanel
@@ -511,7 +544,21 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         pinScroll={pinScroll}
         scrollRequest={scrollReq}
         onReadAloud={handleReadAloud}
+        galleryImages={sessionStoryImgs}
+        onOpenImage={openStoryLightbox}
       />
+
+      {storyLbIdx !== null && sessionStoryImgs[storyLbIdx] && (
+        <Lightbox
+          images={sessionStoryImgs}
+          index={storyLbIdx}
+          onClose={() => setStoryLbIdx(null)}
+          onNavigate={setStoryLbIdx}
+          onDelete={(id) => { gallery.removeImage(id); setStoryLbIdx(null) }}
+          pinnedBgId={pinnedBgId}
+          onSetBg={(id) => gallery.setBgImageId(state.sessionId, id)}
+        />
+      )}
 
       {/* Status bars */}
       {(state.gen || state.stUp || state.summing) && (

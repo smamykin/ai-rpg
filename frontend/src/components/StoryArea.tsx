@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import type { Turn } from '../types'
+import type { Turn, GalleryImage } from '../types'
 import EditorModal from './EditorModal'
 import SelectionToolbar from './SelectionToolbar'
 import * as api from '../api'
@@ -50,9 +50,11 @@ interface Props {
   pinScroll: boolean
   scrollRequest?: number
   onReadAloud: (text: string) => void
+  galleryImages?: GalleryImage[]
+  onOpenImage?: (imageId: string) => void
 }
 
-export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDelete, pinScroll, scrollRequest, onReadAloud }: Props) {
+export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDelete, pinScroll, scrollRequest, onReadAloud, galleryImages, onOpenImage }: Props) {
   const rd = useRef<HTMLDivElement>(null)
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
   const [transforming, setTransforming] = useState(false)
@@ -125,6 +127,7 @@ export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDel
         {turns.map(t => {
           const paragraphs = t.response.split(/\n\n/).filter(p => p.trim())
           const cls = t.action ? 'tn' : 'tn tn-na'
+          const turnImgs = galleryImages ? galleryImages.filter(i => i.turnId === t.id) : []
           return (
             <div key={t.id} className={cls} onClick={() => handleTurnClick(t.id)}>
               {t.action && (
@@ -133,6 +136,19 @@ export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDel
               {paragraphs.map((p, i) => (
                 <p key={i} dangerouslySetInnerHTML={{ __html: formatInline(p) }} />
               ))}
+              {turnImgs.length > 0 && onOpenImage && (
+                <div className="tn-imgs" onClick={e => e.stopPropagation()}>
+                  {turnImgs.map(img => (
+                    <img
+                      key={img.id}
+                      src={img.url}
+                      alt=""
+                      loading="lazy"
+                      onClick={() => onOpenImage(img.id)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}

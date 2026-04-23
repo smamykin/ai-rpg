@@ -13,12 +13,14 @@ interface Props {
   onDelete: (id: string) => void
   onClearAll: () => void
   onSwitch?: (panel: PanelId) => void
+  pinnedBgId?: string | null
+  onSetBg?: (id: string | null) => void
 }
 
 type SourceFilter = 'all' | 'story' | 'lore'
 type ScopeFilter = 'current' | 'all' | 'unassigned'
 
-export default function GalleryPanel({ show, onClose, images, currentSessionId, onNewImage, onDelete, onClearAll, onSwitch }: Props) {
+export default function GalleryPanel({ show, onClose, images, currentSessionId, onNewImage, onDelete, onClearAll, onSwitch, pinnedBgId, onSetBg }: Props) {
   const [source, setSource] = useState<SourceFilter>('all')
   const [scope, setScope] = useState<ScopeFilter>('current')
   const [lbIdx, setLbIdx] = useState<number | null>(null)
@@ -128,6 +130,8 @@ export default function GalleryPanel({ show, onClose, images, currentSessionId, 
           onClose={() => setLbIdx(null)}
           onNavigate={setLbIdx}
           onDelete={(id) => { onDelete(id); setLbIdx(null) }}
+          pinnedBgId={pinnedBgId}
+          onSetBg={onSetBg}
         />
       )}
     </>

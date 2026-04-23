@@ -36,6 +36,8 @@ body {
   height: 100dvh;
   background: var(--bg);
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
   touch-action: pan-y;
   overscroll-behavior-x: contain;
 }
@@ -101,18 +103,63 @@ select {
 .sta:focus { border: none; box-shadow: none; }
 .sta::placeholder { color: var(--mt); font-style: italic; }
 
+/* Ambient background (blurred story image behind content) */
+.ambi {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ambi img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(34px) brightness(.4) saturate(1.1);
+  transform: scale(1.15);
+  opacity: .85;
+  transition: opacity .5s;
+}
+
 /* Story read view */
 .rd {
   flex: 1;
   font-family: var(--story-font, 'Crimson Pro'), Georgia, serif;
   font-size: var(--story-size, 1.1rem);
   line-height: 1.75;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
   padding: 1rem;
   color: var(--tx);
   min-height: 0;
   overflow-y: auto;
 }
+
+/* Inline story-image row (after a turn's paragraphs) */
+.tn-imgs {
+  display: flex;
+  gap: .5rem;
+  overflow-x: auto;
+  padding: .55rem 0 .3rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.tn-imgs::-webkit-scrollbar { display: none; }
+.tn-imgs img {
+  flex: 0 0 auto;
+  height: 180px;
+  width: auto;
+  max-width: 90vw;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--bd);
+  background: var(--bg);
+  cursor: pointer;
+  scroll-snap-align: center;
+  display: block;
+  transition: transform .15s;
+}
+.tn-imgs img:hover { transform: scale(1.02); }
 .rd p { margin-bottom: .85em; }
 .rd .pa {
   border-left: 3px solid var(--ac2);

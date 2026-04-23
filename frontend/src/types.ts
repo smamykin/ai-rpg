@@ -202,6 +202,8 @@ export interface GalleryImage {
   createdAt: number
   source: 'story' | 'lore'
   loreEntryId?: string
+  turnId?: string
+  chapterId?: string
   sessionId?: string | null
 }
 

@@ -7,9 +7,11 @@ interface Props {
   onClose: () => void
   onNavigate: (index: number) => void
   onDelete?: (id: string) => void
+  pinnedBgId?: string | null
+  onSetBg?: (id: string | null) => void
 }
 
-export default function Lightbox({ images, index, onClose, onNavigate, onDelete }: Props) {
+export default function Lightbox({ images, index, onClose, onNavigate, onDelete, pinnedBgId, onSetBg }: Props) {
   const img = images[index]
   const hasPrev = index > 0
   const hasNext = index < images.length - 1
@@ -70,6 +72,13 @@ export default function Lightbox({ images, index, onClose, onNavigate, onDelete 
 
       <div className="lbx-act" onClick={e => e.stopPropagation()}>
         <button className="b bs" onClick={download}>Download</button>
+        {onSetBg && (
+          pinnedBgId === img.id ? (
+            <button className="b bs ba" onClick={() => onSetBg(null)}>&#x2605; Pinned</button>
+          ) : (
+            <button className="b bs" onClick={() => onSetBg(img.id)}>&#x2606; Pin as BG</button>
+          )
+        )}
         {onDelete && (
           <button
             className="b bs"
