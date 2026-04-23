@@ -1,33 +1,28 @@
-import { useState } from 'react'
 import type { GameState } from '../types'
 import { STYLES } from '../types'
-import AIPanel from './panels/AIPanel'
+import GlobalMenu from './GlobalMenu'
 import SuggestNameButton from './SuggestNameButton'
+import ExpandableTextarea from './ExpandableTextarea'
 
 interface Props {
-  state: {
-    name: string
-    overview: string
-    cStyle: string
-    style: string
-    diff: string
-    storyModel: string
-    supportModel: string
-    modelRoles: Record<string, string>
-  }
+  state: GameState
+  dispatch: React.Dispatch<any>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onStart: () => void
   onBack: () => void
 }
 
-export default function Setup({ state, setField, onStart, onBack }: Props) {
-  const [showAI, setShowAI] = useState(false)
-
+export default function Setup({ state, dispatch, setField, onStart, onBack }: Props) {
   return (
     <div className="R">
+      <div className="hd">
+        <button className="b bs" onClick={onBack} title="Back to sessions" aria-label="Back to sessions">&larr;</button>
+        <h1>New Adventure</h1>
+        <GlobalMenu state={state} dispatch={dispatch} setField={setField} />
+      </div>
+
       <div className="su">
         <div>
-          <div className="st">New Adventure</div>
           <p className="ss" style={{ marginTop: '.5rem' }}>Set the scene, then begin.</p>
         </div>
 
@@ -53,12 +48,13 @@ export default function Setup({ state, setField, onStart, onBack }: Props) {
 
         <div style={{ width: '100%' }}>
           <label className="lb">Adventure overview</label>
-          <textarea
+          <ExpandableTextarea
             value={state.overview}
-            onChange={e => setField('overview', e.target.value)}
+            onChange={v => setField('overview', v)}
             placeholder='e.g. "A rogue thief in a steampunk city"'
             rows={4}
             style={{ lineHeight: 1.5 }}
+            title="Adventure overview"
           />
         </div>
 
@@ -95,21 +91,7 @@ export default function Setup({ state, setField, onStart, onBack }: Props) {
         >
           Begin Adventure
         </button>
-
-        <div style={{ display: 'flex', gap: '.5rem' }}>
-          <button className="b bs" onClick={onBack}>&larr; Sessions</button>
-          <button className="b bs" onClick={() => setShowAI(true)}>AI Model</button>
-        </div>
       </div>
-
-      <AIPanel
-        show={showAI}
-        onClose={() => setShowAI(false)}
-        storyModel={state.storyModel}
-        supportModel={state.supportModel}
-        modelRoles={state.modelRoles}
-        setField={setField}
-      />
     </div>
   )
 }

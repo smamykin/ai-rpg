@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { GalleryImage, ImageModelInfo, LoreEntry } from '../types'
 import { DIMENSION_PRESETS, uid } from '../types'
 import * as api from '../api'
+import ExpandableTextarea from './ExpandableTextarea'
 
 interface GameContext {
   story: string             // active chapter content
@@ -199,12 +200,13 @@ export default function GenerateImageModal({
           <>
             <div className="gr">
               <label className="lb">Instructions</label>
-              <textarea
+              <ExpandableTextarea
                 className="mt"
                 value={instructions}
-                onChange={e => setInstructions(e.target.value)}
+                onChange={v => setInstructions(v)}
                 placeholder="Describe what you want the image to show..."
                 rows={3}
+                title="Image AI instructions"
               />
             </div>
 
@@ -242,12 +244,13 @@ export default function GenerateImageModal({
         {/* Prompt field (always visible) */}
         <div className="gr">
           <label className="lb">Image prompt{mode === 'ai' ? ' (preview / edit)' : ''}</label>
-          <textarea
+          <ExpandableTextarea
             className="mt"
             value={prompt}
-            onChange={e => setPrompt(e.target.value)}
+            onChange={v => setPrompt(v)}
             placeholder="The image prompt that will be sent..."
             rows={4}
+            title="Image prompt"
           />
         </div>
 

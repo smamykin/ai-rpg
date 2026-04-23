@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { PromptPreview, Task } from '../../types'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
+import ExpandableTextarea from '../ExpandableTextarea'
 import { budgetLevel } from '../../utils/budget'
 import * as api from '../../api'
 
@@ -96,12 +97,13 @@ export default function PromptPanel({ show, onClose, onSwitch, sessionId, hasAct
         {task === 'action' && (
           <div className="gr">
             <label className="lb">Action text</label>
-            <textarea
+            <ExpandableTextarea
               value={action}
-              onChange={e => setAction(e.target.value)}
+              onChange={v => setAction(v)}
               placeholder="e.g. open the door"
               rows={2}
               style={{ fontSize: '.85rem' }}
+              title="Action text"
             />
           </div>
         )}

@@ -3,10 +3,11 @@ package game
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
-const FormatV5 = "ai-rpg-nano-v5" // chapters model
+const FormatV6 = "ai-rpg-nano-v6" // chapters + turns model
 
 // GameState holds the full game state.
 type GameState struct {
@@ -30,13 +31,13 @@ type GameState struct {
 	AuFreq       int         `json:"auFreq"`
 	TTS          TTSSettings `json:"tts"`
 
-	// Chapters (v5)
+	// Chapters (v6)
 	Chapters         []Chapter `json:"chapters"`
 	ActiveChapterID  string    `json:"activeChapterId,omitempty"`
 	ViewingChapterID string    `json:"viewingChapterId,omitempty"`
 	ArchivedChapters []Chapter `json:"archivedChapters,omitempty"`
 
-	// Context budget (v5)
+	// Context budget (v5+)
 	EffectiveCtxTokens int `json:"effectiveCtxTokens,omitempty"`
 
 	Format string `json:"format,omitempty"`
@@ -55,17 +56,68 @@ type TTSModelSettings struct {
 	DialogueVoice string  `json:"dialogueVoice,omitempty"`
 }
 
-// Chapter represents a single narrative unit — either a leaf chapter with content,
+// Turn is a single player-action/AI-response pair inside a chapter.
+// An opening turn (chapter start or a "continue" generation with no preceding action)
+// has an empty Action.
+type Turn struct {
+	ID        string `json:"id"`
+	Action    string `json:"action,omitempty"`
+	Response  string `json:"response"`
+	CreatedAt int64  `json:"createdAt,omitempty"`
+}
+
+// Chapter represents a single narrative unit — either a leaf chapter with turns,
 // or an act grouping multiple closed chapters under one condensed summary.
 type Chapter struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
-	Content      string   `json:"content"`            // empty for acts
+	Turns        []Turn   `json:"turns,omitempty"`    // empty for acts
 	Summary      string   `json:"summary"`            // empty while active
 	Status       string   `json:"status"`             // "active" | "closed" | "act"
 	Children     []string `json:"children,omitempty"` // chapter IDs — only on acts
 	SummaryStale bool     `json:"summaryStale,omitempty"`
 	CreatedAt    int64    `json:"createdAt"`
+}
+
+// RenderedContent reconstructs the legacy ">-action / \n\n / response" string
+// form from the chapter's turns. Used by prompt building, summarization, export.
+func (c *Chapter) RenderedContent() string {
+	var b strings.Builder
+	for i, t := range c.Turns {
+		if i > 0 {
+			b.WriteString("\n\n")
+		}
+		if t.Action != "" {
+			b.WriteString("> ")
+			b.WriteString(t.Action)
+			if t.Response != "" {
+				b.WriteString("\n\n")
+				b.WriteString(t.Response)
+			}
+		} else {
+			b.WriteString(t.Response)
+		}
+	}
+	return b.String()
+}
+
+// AppendTurn appends a new turn with the given action (response will be filled by streaming).
+func (c *Chapter) AppendTurn(action, response string) *Turn {
+	c.Turns = append(c.Turns, Turn{
+		ID:        fmt.Sprintf("t_%d", time.Now().UnixNano()),
+		Action:    action,
+		Response:  response,
+		CreatedAt: time.Now().Unix(),
+	})
+	return &c.Turns[len(c.Turns)-1]
+}
+
+// LastTurn returns a pointer to the last turn, or nil if there are none.
+func (c *Chapter) LastTurn() *Turn {
+	if len(c.Turns) == 0 {
+		return nil
+	}
+	return &c.Turns[len(c.Turns)-1]
 }
 
 type LoreEntry struct {
@@ -98,30 +150,24 @@ type Scenario struct {
 	UpdatedAt   int64       `json:"updatedAt"`
 }
 
-// Migrate brings state to the current format. For pre-v5 states, it wipes any play
-// progress (story, summaries) while preserving session metadata and setup (lore,
-// overview, sections, TTS). Returns true if the state was mutated.
-//
-// TODO: remove the pre-v5 wipe branch once no users are on older formats (after 2026-06).
+// Migrate brings state to the current format. For any pre-V6 session, it wipes
+// play progress (chapters) while preserving session metadata and setup (lore,
+// overview, sections, TTS). An empty format (frontend PUT that didn't echo it)
+// is treated as current so play progress survives. Returns true if mutated.
 func (s *GameState) Migrate() bool {
 	changed := false
 
-	// Only wipe when the format is a known legacy string. Empty format means the
-	// caller (usually a frontend PUT that forgot to echo it) just didn't set it —
-	// treat it as current and preserve play progress.
-	if s.Format != "" && s.Format != FormatV5 {
-		// Legacy formats carried arbitrary play-progress fields we've since removed.
-		// encoding/json has already silently dropped them during Unmarshal; here we
-		// just reset the chapters structure so the session starts clean.
+	if s.Format != "" && s.Format != FormatV6 {
+		// Known non-V6 format: wipe chapters so play starts clean. Setup is preserved.
 		s.Chapters = nil
 		s.ActiveChapterID = ""
 		s.ViewingChapterID = ""
 		s.ArchivedChapters = nil
-		log.Printf("migrated session %q from format %q to %q (play progress wiped, setup preserved)", s.SessionID, s.Format, FormatV5)
-		s.Format = FormatV5
+		log.Printf("migrated session %q from format %q to %q (play progress wiped, setup preserved)", s.SessionID, s.Format, FormatV6)
+		s.Format = FormatV6
 		changed = true
 	} else if s.Format == "" {
-		s.Format = FormatV5
+		s.Format = FormatV6
 		changed = true
 	}
 
@@ -194,11 +240,11 @@ func (s *GameState) ActiveChapter() *Chapter {
 	return nil
 }
 
-// TotalContentChars sums the content length across all chapters (for session metadata).
+// TotalContentChars sums the rendered content length across all chapters (for session metadata).
 func (s *GameState) TotalContentChars() int {
 	total := 0
-	for _, c := range s.Chapters {
-		total += len(c.Content)
+	for i := range s.Chapters {
+		total += len(s.Chapters[i].RenderedContent())
 	}
 	return total
 }
@@ -216,7 +262,7 @@ func DefaultState() *GameState {
 		Secs:               []Section{},
 		Chapters:           []Chapter{},
 		EffectiveCtxTokens: 32000,
-		Format:             FormatV5,
+		Format:             FormatV6,
 	}
 	s.ensureActiveChapter()
 	s.ViewingChapterID = s.ActiveChapterID

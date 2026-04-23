@@ -76,6 +76,9 @@ function App() {
           setEditingScenarioId(null)
           dispatch({ type: 'SET_PHASE', phase: 'scenarioEditor' })
         }}
+        state={state}
+        dispatch={dispatch}
+        setField={setField}
       />
     )
   }
@@ -84,6 +87,7 @@ function App() {
     return (
       <Setup
         state={state}
+        dispatch={dispatch}
         setField={setField}
         onStart={actions.start}
         onBack={actions.enterHub}

@@ -1,7 +1,14 @@
+export interface Turn {
+  id: string
+  action?: string
+  response: string
+  createdAt?: number
+}
+
 export interface Chapter {
   id: string
   title: string
-  content: string                    // empty for acts
+  turns: Turn[]                      // empty for acts
   summary: string                    // empty while active
   status: 'active' | 'closed' | 'act'
   children?: string[]                // chapter IDs — only on acts
@@ -230,8 +237,24 @@ export function newChapterId(): string {
   return 'ch_' + Date.now() + '_' + (++_counter)
 }
 
+export function newTurnId(): string {
+  return 't_' + Date.now() + '_' + (++_counter)
+}
+
 export function wordCount(text: string): number {
   return text.trim() ? text.trim().split(/\s+/).length : 0
+}
+
+// Join a chapter's turns into the classic `> action\n\nresponse\n\n...` text form
+// used by prompt building, summarization, export, and the token budget display.
+export function renderChapterContent(ch: Pick<Chapter, 'turns'>): string {
+  if (!ch.turns || ch.turns.length === 0) return ''
+  return ch.turns.map(t => {
+    if (t.action) {
+      return t.response ? '> ' + t.action + '\n\n' + t.response : '> ' + t.action
+    }
+    return t.response
+  }).join('\n\n')
 }
 
 export function defaultState(): GameState {
@@ -257,7 +280,7 @@ export function defaultState(): GameState {
     chapters: [{
       id: chapterId,
       title: '',
-      content: '',
+      turns: [],
       summary: '',
       status: 'active',
       createdAt: now,
@@ -266,7 +289,7 @@ export function defaultState(): GameState {
     viewingChapterId: chapterId,
     archivedChapters: [],
     effectiveCtxTokens: 32000,
-    format: 'ai-rpg-nano-v5',
+    format: 'ai-rpg-nano-v6',
   }
 }
 

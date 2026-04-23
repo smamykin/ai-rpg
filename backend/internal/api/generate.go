@@ -83,13 +83,10 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prepend player action to the active chapter's content.
+	// For an action task, append the player's turn now so it's part of the prompt.
+	// Open/continue don't create a turn yet — the prompt reflects existing state.
 	if req.Task == "action" && req.Action != "" {
-		if strings.TrimSpace(active.Content) != "" {
-			active.Content = strings.TrimSpace(active.Content) + "\n\n> " + req.Action
-		} else {
-			active.Content = "> " + req.Action
-		}
+		active.AppendTurn(req.Action, "")
 	}
 
 	prompt := game.BuildPrompt(state, req.Task, req.Action)
@@ -125,13 +122,17 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clean final result and append to active chapter.
-	cleaned := game.Clean(result)
-	if strings.TrimSpace(cleaned) != "" {
-		if strings.TrimSpace(active.Content) != "" {
-			active.Content = strings.TrimSpace(active.Content) + "\n\n" + strings.TrimSpace(cleaned)
+	// Clean final result and write it into the active chapter's turn model.
+	cleaned := strings.TrimSpace(game.Clean(result))
+	if cleaned != "" {
+		last := active.LastTurn()
+		if last != nil && last.Response == "" {
+			// Fill the response of the action turn (or an empty-action turn created
+			// earlier in the session).
+			last.Response = cleaned
 		} else {
-			active.Content = strings.TrimSpace(cleaned)
+			// open/continue with no pending turn: create an opening-style turn.
+			active.AppendTurn("", cleaned)
 		}
 	}
 
@@ -221,7 +222,7 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 	}
 	model := h.resolveSupportModel(state)
 
-	// Build the update prompt (same as prototype)
+	// Build the categories block.
 	var sb strings.Builder
 	for i, s := range req.Sections {
 		content := s.Content
@@ -230,7 +231,7 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 		} else {
 			content = `"` + strings.ReplaceAll(strings.ReplaceAll(content, `"`, `\"`), "\n", `\n`) + `"`
 		}
-		fmt.Fprintf(&sb, "%d. Name: \"%s\"\n   Desc: %s\n   Current: %s\n\n", i+1, s.Name, s.Description, content)
+		fmt.Fprintf(&sb, "%d. Name: \"%s\"\n   Description: %s\n   Current: %s\n\n", i+1, s.Name, s.Description, content)
 	}
 
 	// Take last 3000 chars of story
@@ -239,12 +240,26 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 		story = story[len(story)-3000:]
 	}
 
+	system := "You are a meticulous state tracker for a text-based RPG. You read the recent narrative and update tracked categories (stats, inventory, relationships, etc.) to reflect what has actually happened. Output valid JSON only — no prose, no markdown fences."
+
 	prompt := fmt.Sprintf(
-		"Tracking RPG state.\n\nCategories:\n\n%s\nRecent story:\n%s\n\nUpdate each. If empty, generate initial values.\n\nRespond ONLY JSON. Keys=exact names. Values=strings (\\n for newlines). No markdown.\nExample: {\"Stats\": \"Level: 1\\nHP: 100/100\"}",
+		"<categories>\n%s</categories>\n\n"+
+			"<recent_story>\n%s\n</recent_story>\n\n"+
+			"<instructions>\n"+
+			"Update each category based on <recent_story>.\n"+
+			"- Preserve existing values that the story does not contradict.\n"+
+			"- Only change a value when the story supports the change.\n"+
+			"- If Current is (empty), generate plausible initial values consistent with the story.\n"+
+			"- Do not invent facts not present in the story or existing values.\n"+
+			"</instructions>\n\n"+
+			"<output_format>\n"+
+			"Respond with ONLY a JSON object. Keys = exact category names. Values = strings (use \\n for newlines). No markdown fences, no commentary.\n"+
+			"Example: {\"Stats\": \"Level: 1\\nHP: 100/100\"}\n"+
+			"</output_format>",
 		sb.String(), story,
 	)
 
-	raw, err := h.client.Complete(r.Context(), model, "You output only valid JSON.", prompt, 1000)
+	raw, err := h.client.Complete(r.Context(), model, system, prompt, 1000)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -299,17 +314,17 @@ func (h *Handlers) PromptPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Task == "action" && strings.TrimSpace(req.Action) != "" {
-		// Clone chapters so the hypothetical append doesn't persist.
+		// Clone chapters (and the active chapter's turns slice) so the hypothetical
+		// append doesn't leak into the stored state.
 		chapters := make([]game.Chapter, len(state.Chapters))
 		copy(chapters, state.Chapters)
 		state.Chapters = chapters
 		for i := range state.Chapters {
 			if state.Chapters[i].ID == state.ActiveChapterID {
-				if strings.TrimSpace(state.Chapters[i].Content) != "" {
-					state.Chapters[i].Content = strings.TrimSpace(state.Chapters[i].Content) + "\n\n> " + req.Action
-				} else {
-					state.Chapters[i].Content = "> " + req.Action
-				}
+				turns := make([]game.Turn, len(state.Chapters[i].Turns))
+				copy(turns, state.Chapters[i].Turns)
+				state.Chapters[i].Turns = turns
+				state.Chapters[i].AppendTurn(req.Action, "")
 				break
 			}
 		}

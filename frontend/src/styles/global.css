@@ -117,6 +117,29 @@ select {
   color: var(--mt);
   font-style: italic;
 }
+.rd .tn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: .35rem .55rem;
+  margin-bottom: .4rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.rd .tn:hover { background: var(--sf); border-color: var(--bd); }
+.rd .tn p:last-child { margin-bottom: 0; }
+.rd .tn .pa:last-child { margin-bottom: 0; }
+/* Action-less turn (opening / continue) that follows another turn gets a thin
+   divider so the turn boundary is visible even without a ">" action line. */
+.rd .tn + .tn-na { position: relative; margin-top: .7rem; }
+.rd .tn + .tn-na::before {
+  content: "";
+  position: absolute;
+  top: -.35rem;
+  left: 25%;
+  right: 25%;
+  height: 1px;
+  background: var(--bd);
+}
 .rd .dq { color: var(--ac); }
 .rd strong { font-weight: 700; }
 .rd em { font-style: italic; }
@@ -473,6 +496,80 @@ select {
 .pvs-l { flex: 1; font-weight: 600; color: var(--tx); text-transform: uppercase; letter-spacing: .04em; font-size: .7rem; }
 .pvs-t { font-variant-numeric: tabular-nums; }
 .pvt { background: var(--bg); border: 1px solid var(--bd); border-radius: 6px; padding: .5rem .6rem; font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; font-size: .72rem; line-height: 1.45; color: var(--tx); white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto; margin: 0; }
+
+/* Expandable textarea wrapper */
+.exta-wrap { position: relative; }
+.exta-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--sf2) 85%, transparent);
+  color: var(--mt);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .9rem;
+  line-height: 1;
+  padding: 0;
+  opacity: .75;
+  transition: opacity .15s, color .15s, background .15s;
+}
+.exta-btn:hover { opacity: 1; color: var(--ac); background: var(--sf2); }
+
+/* Editor modal (scalable textarea editor) */
+.emd {
+  position: fixed;
+  z-index: 70;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  width: min(900px, 94vw);
+  height: min(720px, 88dvh);
+  display: flex;
+  flex-direction: column;
+  padding: .8rem;
+  gap: .6rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,.6);
+}
+.emd-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--ac);
+}
+.emd-h span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emd-ta {
+  flex: 1;
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 1rem;
+  line-height: 1.55;
+  padding: .75rem;
+  min-height: 0;
+}
+.emd-ft { display: flex; justify-content: flex-end; gap: .4rem; }
+@media (max-width: 640px) {
+  .emd {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+    top: 0;
+    left: 0;
+    transform: none;
+    padding: .6rem;
+  }
+}
 
 /* Save-as-scenario lore subset list */
 .sas-lore { display: flex; flex-direction: column; gap: .25rem; max-height: 220px; overflow-y: auto; border: 1px solid var(--bd); border-radius: 6px; padding: .35rem; background: var(--sf2); }

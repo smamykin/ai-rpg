@@ -1,23 +1,33 @@
-import type { GameState, TTSSettings } from '../../types'
-import { STYLES } from '../../types'
+import { useState, useCallback, useEffect } from 'react'
+import type { GameState, ModelInfo, ModelRole, TTSSettings } from '../../types'
+import { MODEL_ROLES } from '../../types'
 import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP } from '../../display'
 import type { DisplayPrefs } from '../../display'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
+import ModelPicker from '../ModelPicker'
+import ExpandableTextarea from '../ExpandableTextarea'
 import { TTS_MODELS, TTS_VOICES, getModelMeta, getModelSettings } from '../../constants/tts'
-import * as api from '../../api'
+import * as apiClient from '../../api'
+
+const ROLE_LABELS: Record<ModelRole, { name: string; hint: string }> = {
+  summary:        { name: 'Summaries',      hint: 'Compressing old story into memory. Cheap + long-context works well.' },
+  imagePrompt:    { name: 'Image prompts',  hint: 'Turning instructions into vivid image prompts.' },
+  loreGen:        { name: 'Lore',           hint: 'Generating lore entries from story context.' },
+  scenarioPolish: { name: 'Scenario polish', hint: 'Refining scenario overviews and lore during authoring.' },
+  naming:         { name: 'Naming',         hint: 'Tiny calls: suggested names for sessions, lore entries, scenarios.' },
+}
 
 interface Props {
   show: boolean
   onClose: () => void
-  style: string
-  cStyle: string
-  overview: string
-  diff: string
-  effectiveCtxTokens: number
-  modelCtxMax?: number
-  setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onSwitch?: (panel: PanelId) => void
+  visibleTabs?: PanelId[]
+  storyModel: string
+  supportModel: string
+  modelRoles?: Record<string, string>
+  effectiveCtxTokens: number
+  setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   displayPrefs: DisplayPrefs
   onSetTheme: (id: string) => void
   onSetFontFamily: (name: string) => void
@@ -29,31 +39,44 @@ interface Props {
 }
 
 export default function SettingsPanel({
-  show, onClose, style, cStyle, overview, diff, effectiveCtxTokens, modelCtxMax, setField, onSwitch,
+  show, onClose, onSwitch, visibleTabs,
+  storyModel, supportModel, modelRoles,
+  effectiveCtxTokens, setField,
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize,
   tts, dispatch, ttsPlaying, onStopTTS,
 }: Props) {
-  const ctxMax = Math.max(modelCtxMax || 128000, 8000)
-  const activeModel = tts?.activeModel || 'Kokoro-82m'
-  const modelMeta = getModelMeta(activeModel)
-  const modelSettings = getModelSettings(tts, activeModel)
-  const voices = TTS_VOICES[activeModel] || []
+  const [models, setModels] = useState<ModelInfo[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [modelsErr, setModelsErr] = useState('')
 
-  const updateModelSetting = (key: 'voice' | 'speed' | 'instructions' | 'dialogueVoice', value: string | number) => {
-    dispatch({ type: 'SET_TTS_MODEL_SETTING', model: activeModel, settings: { [key]: value } })
-  }
-
-  const handleClearAllData = async () => {
-    if (!window.confirm('Delete all sessions, scenarios, gallery images, and local preferences? This cannot be undone.')) return
-    if (!window.confirm('Really? Everything will be wiped and the app will reload.')) return
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true)
+    setModelsErr('')
     try {
-      await api.resetAllData()
-    } catch { /* ignore — we're wiping anyway */ }
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const k = localStorage.key(i)
-      if (k && k.startsWith('ai-rpg-')) localStorage.removeItem(k)
+      const list = await apiClient.getModels()
+      setModels(list)
+    } catch (e) {
+      setModelsErr(e instanceof Error ? e.message : 'Failed to load models')
     }
-    location.reload()
+    setModelsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (show && models.length === 0 && !modelsLoading) {
+      loadModels()
+    }
+  }, [show, models.length, modelsLoading, loadModels])
+
+  const modelCtx = models.find(m => m.id === storyModel)?.ctx || 0
+  const ctxMax = Math.max(modelCtx || 128000, 8000)
+
+  const activeTTSModel = tts?.activeModel || 'Kokoro-82m'
+  const ttsMeta = getModelMeta(activeTTSModel)
+  const ttsModelSettings = getModelSettings(tts, activeTTSModel)
+  const voices = TTS_VOICES[activeTTSModel] || []
+
+  const updateTTSSetting = (key: 'voice' | 'speed' | 'instructions' | 'dialogueVoice', value: string | number) => {
+    dispatch({ type: 'SET_TTS_MODEL_SETTING', model: activeTTSModel, settings: { [key]: value } })
   }
 
   return (
@@ -64,32 +87,54 @@ export default function SettingsPanel({
           <span>Settings</span>
           <button className="b bs" onClick={onClose}>&#x2715;</button>
         </div>
-        {onSwitch && <PanelTabs active="settings" onSwitch={onSwitch} />}
+        {onSwitch && <PanelTabs active="settings" onSwitch={onSwitch} visibleTabs={visibleTabs} />}
 
-        <div className="gr">
-          <label className="lb">Response Length</label>
-          <select value={style} onChange={e => setField('style', e.target.value)}>
-            {STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+        <div style={{ margin: '0 0 .6rem' }}>
+          <label className="lb" style={{ marginBottom: '.5rem' }}>AI Model</label>
         </div>
 
         <div className="gr">
-          <label className="lb">Custom Writing Style</label>
-          <textarea value={cStyle} onChange={e => setField('cStyle', e.target.value)} placeholder='e.g. "Lovecraftian horror"' rows={3} />
-          <div className="hint">Overrides default style when set.</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.3rem' }}>
+            <label className="lb" style={{ marginBottom: 0 }}>Models</label>
+            <button className="b bs" onClick={loadModels} disabled={modelsLoading}>
+              {modelsLoading ? '\u23f3' : '\ud83d\udd04'} {models.length ? `Refresh (${models.length})` : 'Load'}
+            </button>
+          </div>
+          {modelsErr && <div className="er" style={{ margin: '.3rem 0' }}>{modelsErr}</div>}
+          {!models.length && !modelsLoading && !modelsErr && (
+            <div className="hint">Click Load to fetch the model list.</div>
+          )}
         </div>
 
         <div className="gr">
-          <label className="lb">Adventure Overview</label>
-          <textarea value={overview} onChange={e => setField('overview', e.target.value)} placeholder="What it's about..." rows={3} />
+          <label className="lb">Story model</label>
+          <ModelPicker
+            id="story"
+            value={storyModel}
+            onChange={v => setField('storyModel', v)}
+            models={models}
+            placeholder="e.g. anthropic/claude-sonnet-4-20250514"
+          />
+          <div className="hint">Used for narrative generation. Pick a strong writing model.</div>
         </div>
 
         <div className="gr">
-          <label className="lb">Difficulty</label>
-          <select value={diff} onChange={e => setField('diff', e.target.value)}>
-            <option value="normal">Normal</option>
-            <option value="hard">Hard (permadeath)</option>
-          </select>
+          <label className="lb">Support model</label>
+          <div style={{ display: 'flex', gap: '.35rem', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <ModelPicker
+                id="support"
+                value={supportModel}
+                onChange={v => setField('supportModel', v)}
+                models={models}
+                placeholder="e.g. openai/gpt-4.1-mini"
+              />
+            </div>
+            {storyModel && storyModel !== supportModel && (
+              <button className="b bs" onClick={() => setField('supportModel', storyModel)} title="Use same as story model">=</button>
+            )}
+          </div>
+          <div className="hint">Default fallback for all non-story tasks. Individual tasks below can override.</div>
         </div>
 
         <div className="gr">
@@ -104,6 +149,34 @@ export default function SettingsPanel({
           />
           <div className="hint">Token budget for each prompt. The app warns at 65% and blocks generation at 90%.</div>
         </div>
+
+        <details className="adv">
+          <summary>Advanced &mdash; per-task models</summary>
+          <div className="hint" style={{ marginBottom: '.5rem' }}>
+            Override specific tasks. Empty = inherit Support.
+          </div>
+          {MODEL_ROLES.map(role => {
+            const current = modelRoles?.[role] ?? ''
+            return (
+              <div key={role} className="gr">
+                <label className="lb">{ROLE_LABELS[role].name}</label>
+                <ModelPicker
+                  id={`role-${role}`}
+                  value={current}
+                  onChange={v => {
+                    const next = { ...(modelRoles || {}) }
+                    if (v) next[role] = v
+                    else delete next[role]
+                    setField('modelRoles', next)
+                  }}
+                  models={models}
+                  placeholder="(inherit Support)"
+                />
+                <div className="hint">{ROLE_LABELS[role].hint}</div>
+              </div>
+            )
+          })}
+        </details>
 
         <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
           <label className="lb" style={{ marginBottom: '.5rem' }}>Text-to-Speech</label>
@@ -125,48 +198,49 @@ export default function SettingsPanel({
 
         <div className="gr">
           <label className="lb">TTS Model</label>
-          <select value={activeModel} onChange={e => dispatch({ type: 'SET_TTS_MODEL', model: e.target.value })}>
+          <select value={activeTTSModel} onChange={e => dispatch({ type: 'SET_TTS_MODEL', model: e.target.value })}>
             {TTS_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
-          <div className="hint">${modelMeta.pricePer1K.toFixed(4)} per 1K chars.</div>
+          <div className="hint">${ttsMeta.pricePer1K.toFixed(4)} per 1K chars.</div>
         </div>
 
         <div className="gr">
           <label className="lb">Voice</label>
-          <select value={modelSettings.voice} onChange={e => updateModelSetting('voice', e.target.value)}>
+          <select value={ttsModelSettings.voice} onChange={e => updateTTSSetting('voice', e.target.value)}>
             {voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
           </select>
         </div>
 
         <div className="gr">
-          <label className="lb">Speed: {(modelSettings.speed || 1.0).toFixed(2)}x</label>
+          <label className="lb">Speed: {(ttsModelSettings.speed || 1.0).toFixed(2)}x</label>
           <input
             type="range"
             min={0.5}
             max={2.0}
             step={0.05}
-            value={modelSettings.speed || 1.0}
-            onChange={e => updateModelSetting('speed', parseFloat(e.target.value))}
+            value={ttsModelSettings.speed || 1.0}
+            onChange={e => updateTTSSetting('speed', parseFloat(e.target.value))}
           />
         </div>
 
-        {modelMeta.supportsInstructions && (
+        {ttsMeta.supportsInstructions && (
           <div className="gr">
             <label className="lb">Instructions</label>
-            <textarea
-              value={modelSettings.instructions || ''}
-              onChange={e => updateModelSetting('instructions', e.target.value)}
+            <ExpandableTextarea
+              value={ttsModelSettings.instructions || ''}
+              onChange={v => updateTTSSetting('instructions', v)}
               placeholder='e.g. "read in a dramatic whisper, like an ancient storyteller"'
               rows={2}
+              title="TTS instructions"
             />
             <div className="hint">Natural-language voice direction.</div>
           </div>
         )}
 
-        {modelMeta.supportsDialogueVoice && (
+        {ttsMeta.supportsDialogueVoice && (
           <div className="gr">
             <label className="lb">Dialogue voice (optional)</label>
-            <select value={modelSettings.dialogueVoice || ''} onChange={e => updateModelSetting('dialogueVoice', e.target.value)}>
+            <select value={ttsModelSettings.dialogueVoice || ''} onChange={e => updateTTSSetting('dialogueVoice', e.target.value)}>
               <option value="">&mdash; none &mdash;</option>
               {voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
@@ -229,21 +303,6 @@ export default function SettingsPanel({
               disabled={displayPrefs.fontSize >= FONT_SIZE_MAX}
             >+</button>
           </div>
-        </div>
-
-        <div style={{ borderTop: '1px solid var(--bd)', margin: '.6rem 0', paddingTop: '.6rem' }}>
-          <label className="lb" style={{ marginBottom: '.5rem', color: 'var(--dng)' }}>Danger Zone</label>
-        </div>
-
-        <div className="gr">
-          <button
-            className="b"
-            onClick={handleClearAllData}
-            style={{ color: 'var(--dng)', borderColor: 'var(--dng)' }}
-          >
-            Clear all data
-          </button>
-          <div className="hint">Deletes all sessions, scenarios, gallery images, and local preferences (including TTS settings). Cannot be undone.</div>
         </div>
       </div>
     </>

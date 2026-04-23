@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
-import type { Chapter, GameState, LoreEntry, Section, Phase, TTSModelSettings } from '../types'
-import { defaultState, getActiveChapter, getViewingChapter, newChapterId, wordCount } from '../types'
+import type { Chapter, GameState, LoreEntry, Section, Phase, TTSModelSettings, Turn } from '../types'
+import { defaultState, getActiveChapter, getViewingChapter, newChapterId, newTurnId, renderChapterContent, wordCount } from '../types'
 import { expandShortcut } from '../utils/shortcuts'
 import * as api from '../api'
 
@@ -113,7 +113,7 @@ function reducer(state: State, action: Action): State {
     case 'LOAD_STATE': {
       const loaded = action.state
       const active = loaded.chapters?.find(c => c.id === loaded.activeChapterId) || loaded.chapters?.find(c => c.status === 'active')
-      const hasPlayContent = !!(loaded.overview || (active && active.content))
+      const hasPlayContent = !!(loaded.overview || (active && active.turns && active.turns.length > 0))
       return {
         ...state,
         ...loaded,
@@ -295,9 +295,10 @@ export function useGameState() {
   // Check if the currently-viewed chapter is the active one. Generation actions require this.
   const isViewingActive = state.viewingChapterId === state.activeChapterId
 
-  // Generate appends to the active chapter's content. Always operates on the active chapter,
-  // regardless of which chapter the user is viewing. UI should block calls when not viewing active.
-  const generate = useCallback((task: string, actionText?: string, baseContent?: string) => {
+  // Generate appends a new turn (or fills the pending one) on the active chapter.
+  // Always operates on the active chapter regardless of what the user is viewing.
+  // UI should block calls when not viewing active.
+  const generate = useCallback((task: string, actionText?: string, baseTurns?: Turn[]) => {
     const cur = stateRef.current
     const active = getActiveChapter(cur)
     if (!active) return
@@ -307,21 +308,29 @@ export function useGameState() {
     dispatch({ type: 'SET_ERR', err: '' })
     dispatch({ type: 'SET_STREAMING', text: '' })
 
-    const base = baseContent ?? active.content
-
-    let currentContent = base
-    if (task === 'action' && actionText) {
-      currentContent = (base.trim() ? base.trim() + '\n\n' : '') + '> ' + actionText
-      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: currentContent } })
+    const priorTurns = baseTurns ?? active.turns
+    // The "pending" turn is where streaming text lands. For an action we create a
+    // fresh turn with the player's action; for open/continue it has no action.
+    const pendingId = newTurnId()
+    const pending: Turn = {
+      id: pendingId,
+      action: task === 'action' && actionText ? actionText : undefined,
+      response: '',
+      createdAt: Math.floor(Date.now() / 1000),
     }
+    const initialTurns: Turn[] = [...priorTurns, pending]
+    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: initialTurns } })
 
     const ctrl = new AbortController()
     abortRef.current = ctrl
 
     // Save latest state so the backend sees the new action before generating.
+    // Strip the empty pending turn (which has no response yet) — the backend will
+    // recreate its own action turn for task='action' inside Generate.
+    const optimisticTurns = task === 'action' && actionText ? priorTurns : priorTurns
     const optimistic: State = {
       ...cur,
-      chapters: cur.chapters.map(c => c.id === active.id ? { ...c, content: currentContent } : c),
+      chapters: cur.chapters.map(c => c.id === active.id ? { ...c, turns: optimisticTurns } : c),
     }
     const savePromise = api.saveState(toPersistable(optimistic)).catch(() => {})
 
@@ -330,32 +339,32 @@ export function useGameState() {
         onChunk: (text) => {
           dispatch({ type: 'SET_GEN_STAGE', stage: 'writing' })
           dispatch({ type: 'SET_STREAMING', text })
-          dispatch({
-            type: 'UPDATE_CHAPTER',
-            id: active.id,
-            patch: { content: currentContent.trim() + '\n\n' + text },
-          })
+          const updated: Turn[] = initialTurns.map(t => t.id === pendingId ? { ...t, response: text } : t)
+          dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: updated } })
         },
         onDone: (text) => {
-          const finalContent = currentContent.trim() + (text.trim() ? '\n\n' + text.trim() : '')
-          dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: finalContent } })
+          const trimmed = text.trim()
+          // If the pending turn has no action and no response, drop it (empty generation).
+          const finalTurns: Turn[] = (!trimmed && !pending.action)
+            ? priorTurns
+            : initialTurns.map(t => t.id === pendingId ? { ...t, response: trimmed } : t)
+          dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: finalTurns } })
           dispatch({ type: 'SET_STREAMING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
-          if (text.trim()) dispatch({ type: 'SET_LAST_NARRATION', text: text.trim() })
+          if (trimmed) dispatch({ type: 'SET_LAST_NARRATION', text: trimmed })
 
           // Flush immediately so a reload right after completion preserves the result.
-          // The debounced auto-save would otherwise drop it if the user reloads within 1s.
           const latest = stateRef.current
           const flushed: State = {
             ...latest,
-            chapters: latest.chapters.map(c => c.id === active.id ? { ...c, content: finalContent } : c),
+            chapters: latest.chapters.map(c => c.id === active.id ? { ...c, turns: finalTurns } : c),
           }
           clearTimeout(saveTimer.current)
           skipNextSave.current = true
           api.saveState(toPersistable(flushed)).catch(() => {})
 
-          if (text.trim() && cur.auFreq > 0 && cur.secs.length > 0) {
+          if (trimmed && cur.auFreq > 0 && cur.secs.length > 0) {
             genCountRef.current++
             if (genCountRef.current >= cur.auFreq) {
               genCountRef.current = 0
@@ -368,6 +377,10 @@ export function useGameState() {
           dispatch({ type: 'SET_STREAMING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
+          // Drop the pending turn so it's not orphaned with empty response.
+          if (!pending.action) {
+            dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: priorTurns } })
+          }
         },
       })
     })
@@ -386,52 +399,39 @@ export function useGameState() {
   const cont = useCallback(() => {
     if (state.gen || state.summing || !isViewingActive) return
     const active = getActiveChapter(state)
-    const isFirstChunk = !active || !active.content.trim()
+    const isFirstChunk = !active || active.turns.length === 0
     generate(isFirstChunk ? 'open' : 'continue')
   }, [generate, state, isViewingActive])
 
-  // Regen re-does the last generation. It derives its base from the active chapter's
-  // content (not a transient ref — that resets on reload) by stripping the last
-  // generated paragraph. If the chunk before that is a player action ("> ..."),
-  // the regen re-runs as 'action' preserving the action line.
+  // Regen re-does the last turn. If the last turn had a player action, keeps the
+  // action and regenerates as 'action'; otherwise regenerates as 'continue' / 'open'.
   const regen = useCallback(() => {
     if (state.gen || state.summing || !isViewingActive) return
     const active = getActiveChapter(state)
     if (!active) return
 
-    const trimmed = active.content.trim()
-    const chunks = trimmed ? trimmed.split(/\n\n/) : []
-    if (chunks.length === 0) {
-      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: '' } })
+    if (active.turns.length === 0) {
       generate('open')
       return
     }
-    // Drop the last chunk — the generated paragraph we're replacing.
-    chunks.pop()
-    const prior = chunks[chunks.length - 1] || ''
-    if (prior.startsWith('> ')) {
-      // Last generation responded to a player action — keep the action, regen it.
-      chunks.pop()
-      const base = chunks.join('\n\n')
-      dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
-      generate('action', prior.replace(/^> /, ''), base)
-      return
+    const last = active.turns[active.turns.length - 1]
+    const base = active.turns.slice(0, -1)
+    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: base } })
+    if (last.action) {
+      generate('action', last.action, base)
+    } else if (base.length === 0) {
+      generate('open', undefined, base)
+    } else {
+      generate('continue', undefined, base)
     }
-    const base = chunks.join('\n\n')
-    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: base } })
-    if (!base.trim()) generate('open')
-    else generate('continue', undefined, base)
   }, [generate, state, isViewingActive])
 
   const deleteLast = useCallback(() => {
     if (state.gen || state.summing || !isViewingActive) return
     const active = getActiveChapter(state)
-    if (!active) return
-    const chunks = active.content.trim().split(/\n\n/)
-    if (!chunks.length) return
-    chunks.pop()
-    if (chunks.length && chunks[chunks.length - 1].startsWith('> ')) chunks.pop()
-    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { content: chunks.join('\n\n') } })
+    if (!active || active.turns.length === 0) return
+    const turns = active.turns.slice(0, -1)
+    dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns } })
   }, [state, isViewingActive])
 
   const stop = useCallback(() => {
@@ -458,14 +458,42 @@ export function useGameState() {
     const cur = stateRef.current
     const ch = cur.chapters.find(c => c.id === id)
     if (!ch) return
-    // If content or summary changes on a closed/act chapter, mark summary stale.
-    const isStructural = (patch.content !== undefined && patch.content !== ch.content) ||
-                         (patch.summary !== undefined && patch.summary !== ch.summary)
+    // If turns or summary changes on a closed/act chapter, mark summary stale.
+    const turnsChanged = patch.turns !== undefined && patch.turns !== ch.turns
+    const summaryChanged = patch.summary !== undefined && patch.summary !== ch.summary
+    const isStructural = turnsChanged || summaryChanged
     const needsStale = isStructural && (ch.status === 'closed' || ch.status === 'act') && patch.summaryStale === undefined
-    const finalPatch: Partial<Chapter> = needsStale && patch.content !== undefined
+    const finalPatch: Partial<Chapter> = needsStale && turnsChanged
       ? { ...patch, summaryStale: true }
       : patch
     dispatch({ type: 'UPDATE_CHAPTER', id, patch: finalPatch })
+  }, [])
+
+  // editTurn updates a single turn inside a chapter. Used by the per-turn editor modal.
+  const editTurn = useCallback((chapterId: string, turnId: string, patch: Partial<Turn>) => {
+    const cur = stateRef.current
+    const ch = cur.chapters.find(c => c.id === chapterId)
+    if (!ch) return
+    const turns = ch.turns.map(t => t.id === turnId ? { ...t, ...patch } : t)
+    const isClosedOrAct = ch.status === 'closed' || ch.status === 'act'
+    dispatch({
+      type: 'UPDATE_CHAPTER',
+      id: chapterId,
+      patch: isClosedOrAct ? { turns, summaryStale: true } : { turns },
+    })
+  }, [])
+
+  const deleteTurn = useCallback((chapterId: string, turnId: string) => {
+    const cur = stateRef.current
+    const ch = cur.chapters.find(c => c.id === chapterId)
+    if (!ch) return
+    const turns = ch.turns.filter(t => t.id !== turnId)
+    const isClosedOrAct = ch.status === 'closed' || ch.status === 'act'
+    dispatch({
+      type: 'UPDATE_CHAPTER',
+      id: chapterId,
+      patch: isClosedOrAct ? { turns, summaryStale: true } : { turns },
+    })
   }, [])
 
   const resummarizeChapter = useCallback(async (id: string) => {
@@ -483,7 +511,7 @@ export function useGameState() {
           .join('\n\n---\n\n')
         summaryText = await api.summarize(childSummaries, true)
       } else {
-        summaryText = await api.summarize(ch.content)
+        summaryText = await api.summarize(renderChapterContent(ch))
       }
       const trimmed = summaryText.trim()
       if (trimmed) {
@@ -500,15 +528,16 @@ export function useGameState() {
   const endChapterAndStartNew = useCallback(async () => {
     const cur = stateRef.current
     const active = getActiveChapter(cur)
-    if (!active || !active.content.trim() || cur.gen || cur.summing) return
+    const activeContent = active ? renderChapterContent(active) : ''
+    if (!active || !activeContent.trim() || cur.gen || cur.summing) return
 
     dispatch({ type: 'SET_SUMMING', summing: true })
     dispatch({ type: 'SET_GEN_STAGE', stage: 'summarizing' })
 
     try {
       const [summaryText, titleText] = await Promise.all([
-        api.summarize(active.content),
-        api.suggestName('session', active.content.slice(0, 4000)).catch(() => ''),
+        api.summarize(activeContent),
+        api.suggestName('session', activeContent.slice(0, 4000)).catch(() => ''),
       ])
       const summary = summaryText.trim()
       let title = titleText.trim()
@@ -528,7 +557,7 @@ export function useGameState() {
       const newCh: Chapter = {
         id: newId,
         title: '',
-        content: '',
+        turns: [],
         summary: '',
         status: 'active',
         createdAt: Math.floor(Date.now() / 1000),
@@ -594,7 +623,7 @@ export function useGameState() {
       const act: Chapter = {
         id: actId,
         title: `Act ${toRoman(actCount)}`,
-        content: '',
+        turns: [],
         summary: trimmed,
         status: 'act',
         children: children.map(c => c.id),
@@ -652,7 +681,7 @@ export function useGameState() {
           chapter: {
             id: newId,
             title: '',
-            content: '',
+            turns: [],
             summary: '',
             status: 'active',
             createdAt: Math.floor(Date.now() / 1000),
@@ -681,7 +710,7 @@ export function useGameState() {
     dispatch({ type: 'SET_ERR', err: '' })
 
     try {
-      const updated = await api.updateStats(cur.secs, active?.content || '')
+      const updated = await api.updateStats(cur.secs, active ? renderChapterContent(active) : '')
       dispatch({ type: 'SET_SECS', secs: updated })
     } catch (e) {
       dispatch({ type: 'SET_ERR', err: 'Stats update failed: ' + (e instanceof Error ? e.message : '') })
@@ -728,7 +757,7 @@ export function useGameState() {
     const cur = stateRef.current
     const body = cur.chapters.map(c => {
       const title = c.title || ''
-      if (c.status === 'active') return `## ${title || 'Current'}\n\n${c.content}`
+      if (c.status === 'active') return `## ${title || 'Current'}\n\n${renderChapterContent(c)}`
       if (c.status === 'closed') return `## ${title}\n\n${c.summary}`
       if (c.status === 'act') return `## ${title} (condensed)\n\n${c.summary}`
       return ''
@@ -761,7 +790,7 @@ export function useGameState() {
   // Computed values
   const activeChapter = getActiveChapter(state)
   const viewingChapter = getViewingChapter(state)
-  const activeWordCount = wordCount(activeChapter?.content || '')
+  const activeWordCount = wordCount(activeChapter ? renderChapterContent(activeChapter) : '')
 
   return {
     state,
@@ -777,6 +806,8 @@ export function useGameState() {
       openChapter,
       returnToActive,
       editChapter,
+      editTurn,
+      deleteTurn,
       resummarizeChapter,
       endChapterAndStartNew,
       rewindToChapter,

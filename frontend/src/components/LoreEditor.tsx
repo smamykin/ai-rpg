@@ -4,6 +4,7 @@ import { uid, LORE_TAGS } from '../types'
 import * as api from '../api'
 import Lightbox from './Lightbox'
 import SuggestNameButton from './SuggestNameButton'
+import ExpandableTextarea from './ExpandableTextarea'
 
 const TAG_COLORS: Record<string, string> = {
   world: 'var(--ac)',
@@ -188,12 +189,13 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
 
       <div className="gr">
         <label className="lb">Content</label>
-        <textarea
+        <ExpandableTextarea
           className="mt"
           value={selected.text}
-          onChange={e => update(selected.id, { text: e.target.value })}
+          onChange={v => update(selected.id, { text: v })}
           placeholder="Lore content..."
           rows={6}
+          title={selected.name || 'Lore content'}
         />
         {aiContext && (
           <>
@@ -209,12 +211,13 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
               <div style={{ border: '1px solid var(--bd)', borderRadius: '8px', padding: '.5rem', marginTop: '.4rem', background: 'var(--bg)' }}>
                 <div className="gr" style={{ marginBottom: '.5rem' }}>
                   <label className="lb">Instructions (optional)</label>
-                  <textarea
+                  <ExpandableTextarea
                     className="mt"
                     value={aiInstructions}
-                    onChange={e => setAiInstructions(e.target.value)}
+                    onChange={v => setAiInstructions(v)}
                     placeholder="e.g. focus on appearance, describe relationships..."
                     rows={2}
+                    title="Lore AI instructions"
                   />
                 </div>
                 <div className="gm-ctx" style={{ marginBottom: '.5rem' }}>

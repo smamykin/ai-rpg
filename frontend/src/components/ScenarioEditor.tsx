@@ -3,6 +3,7 @@ import type { Scenario } from '../types'
 import { defaultScenario, STYLES } from '../types'
 import LoreEditor from './LoreEditor'
 import SuggestNameButton from './SuggestNameButton'
+import ExpandableTextarea from './ExpandableTextarea'
 import * as api from '../api'
 
 interface Props {
@@ -123,11 +124,12 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
 
         <div className="gr" style={{ width: '100%' }}>
           <label className="lb">Overview</label>
-          <textarea
+          <ExpandableTextarea
             value={sc.overview}
-            onChange={e => update('overview', e.target.value)}
+            onChange={v => update('overview', v)}
             rows={4}
             placeholder='e.g. "A rogue thief in a steampunk city"'
+            title="Scenario overview"
           />
         </div>
 

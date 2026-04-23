@@ -7,6 +7,15 @@ import (
 
 const SystemPrompt = `You are the world's best Game Master — a masterful storyteller with perfect pacing, intrigue, and a knack for keeping players on the edge of their seat. You simulate an open-world text adventure RPG.
 
+Context tags you may receive (treat them as ground truth):
+- <lore>: persistent world and character facts. Never contradict.
+- <overview>: the adventure's premise and setup.
+- <story_so_far>: past narrative. Earlier chapters are condensed summaries; the current chapter is full text. Player actions are prefixed with ">".
+- <current_game_state>: tracked stats, inventory, and flags. Authoritative — overrides any conflicting narrative memory.
+- <difficulty>: tone and consequence modifier.
+- <director_note>: out-of-band steering from the user. Could be a plot beat to head toward, a focus request ("describe the ship in more detail"), or a tone nudge. Honor it naturally without breaking immersion or narrating it as meta.
+- <task>: what to write this turn. Follow it exactly.
+
 Rules:
 - Use 2nd person perspective ("You walk into...")
 - NEVER make choices for the player or invoke new player actions
@@ -20,8 +29,7 @@ Rules:
 - Note interactable objects/items/exits in the environment
 - Avoid repetition of previous text
 - NEVER use: cacophony, symphony, verdant, tapestry, testament, sentinel, cerulean
-- Avoid purple prose, excessive metaphors, exposition dumps
-- If <current_game_state> is provided, respect it strictly`
+- Avoid purple prose, excessive metaphors, exposition dumps`
 
 // PromptSection is one labeled part of the assembled user prompt.
 type PromptSection struct {
@@ -65,10 +73,11 @@ func buildSections(state *GameState, task, action string) []PromptSection {
 		}
 	}
 	if len(enabledLore) > 0 {
-		lb.WriteString("# World & Character Lore:\n")
+		lb.WriteString("<lore>\n")
 		for _, l := range enabledLore {
 			fmt.Fprintf(&lb, "**%s**: %s\n\n", l.Name, strings.TrimSpace(l.Text))
 		}
+		lb.WriteString("</lore>\n\n")
 		out = append(out, PromptSection{Label: "Lore", Text: lb.String()})
 	}
 
@@ -76,7 +85,7 @@ func buildSections(state *GameState, task, action string) []PromptSection {
 	if state.Overview != "" {
 		out = append(out, PromptSection{
 			Label: "Overview",
-			Text:  fmt.Sprintf("# Adventure Overview:\n%s\n\n", state.Overview),
+			Text:  fmt.Sprintf("<overview>\n%s\n</overview>\n\n", state.Overview),
 		})
 	}
 
@@ -106,15 +115,15 @@ func buildSections(state *GameState, task, action string) []PromptSection {
 	if state.Diff == "hard" {
 		out = append(out, PromptSection{
 			Label: "Difficulty",
-			Text:  "DIFFICULTY: VERY HARD — permadeath, realistic consequences, impossible actions fail.\n\n",
+			Text:  "<difficulty>VERY HARD — permadeath, realistic consequences, impossible actions fail.</difficulty>\n\n",
 		})
 	}
 
-	// Story arc
+	// Director note (user-provided steering: plot target, focus ask, tone nudge, etc.)
 	if arc := strings.TrimSpace(state.Arc); arc != "" {
 		out = append(out, PromptSection{
-			Label: "Arc",
-			Text:  fmt.Sprintf("NEXT_KEY_EVENT (*naturally* guide the story towards this): %s\n\n", arc),
+			Label: "Director note",
+			Text:  fmt.Sprintf("<director_note>\n%s\n</director_note>\n\n", arc),
 		})
 	}
 
@@ -126,11 +135,11 @@ func buildSections(state *GameState, task, action string) []PromptSection {
 	var taskText string
 	switch task {
 	case "open":
-		taskText = fmt.Sprintf("TASK: Write the opening paragraph based on the Adventure Overview above. One paragraph only — just the START. Specific situation, maybe NPC dialogue. Avoid grandiose phrasing.%s", styleSuffix)
+		taskText = fmt.Sprintf("<task>\nWrite the opening paragraph based on the <overview> above. One paragraph only — just the START. Specific situation, maybe NPC dialogue. Avoid grandiose phrasing.%s\n</task>", styleSuffix)
 	case "action":
-		taskText = fmt.Sprintf("TASK: Player's action: \"%s\"\nWrite direct consequences. Include NPC dialogue if relevant. Do NOT make choices for the player.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s", action, state.Style, styleSuffix)
+		taskText = fmt.Sprintf("<task>\nPlayer's action: \"%s\"\nWrite direct consequences. Include NPC dialogue if relevant. Do NOT make choices for the player.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s\n</task>", action, state.Style, styleSuffix)
 	default: // "continue"
-		taskText = fmt.Sprintf("TASK: Continue the story naturally. Include dialogue when relevant.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s", state.Style, styleSuffix)
+		taskText = fmt.Sprintf("<task>\nContinue the story naturally. Include dialogue when relevant.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s\n</task>", state.Style, styleSuffix)
 	}
 	out = append(out, PromptSection{Label: "Task", Text: taskText})
 
@@ -193,7 +202,7 @@ func buildStoryBody(state *GameState) string {
 
 	writeHeader := func() {
 		if !hasAny {
-			b.WriteString("# Story So Far (player actions prefixed with \">\"):\n\n")
+			b.WriteString("<story_so_far>\n(Player actions are prefixed with \">\".)\n\n")
 			hasAny = true
 		}
 	}
@@ -229,7 +238,7 @@ func buildStoryBody(state *GameState) string {
 			writeHeader()
 			fmt.Fprintf(&b, "## %s\n%s\n\n", title, s)
 		case "active":
-			content := strings.TrimSpace(c.Content)
+			content := strings.TrimSpace(c.RenderedContent())
 			if content == "" {
 				continue
 			}
@@ -242,6 +251,9 @@ func buildStoryBody(state *GameState) string {
 		}
 	}
 
+	if hasAny {
+		b.WriteString("</story_so_far>\n\n")
+	}
 	return b.String()
 }
 

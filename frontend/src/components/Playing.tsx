@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import StoryArea from './StoryArea'
 import ActionInput from './ActionInput'
-import AIPanel from './panels/AIPanel'
-import MemoryPanel from './panels/MemoryPanel'
+import StoryPanel from './panels/StoryPanel'
 import TrackingPanel from './panels/TrackingPanel'
 import SettingsPanel from './panels/SettingsPanel'
 import GalleryPanel from './panels/GalleryPanel'
@@ -13,14 +12,14 @@ import SaveAsScenarioModal from './SaveAsScenarioModal'
 import RewindModal from './RewindModal'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
-import type { Chapter, GameState, GalleryImage, TTSSettings } from '../types'
+import type { Chapter, GameState, GalleryImage, TTSSettings, Turn } from '../types'
+import { renderChapterContent } from '../types'
 import { useGallery } from '../hooks/useGallery'
 import { useToast } from '../hooks/useToast'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
 import { useTTS } from '../hooks/useTTS'
 import { getModelMeta, getModelSettings } from '../constants/tts'
 import { estimatePromptTokens, budgetLevel } from '../utils/budget'
-import * as api from '../api'
 
 interface Props {
   state: {
@@ -64,6 +63,8 @@ interface Props {
     openChapter: (id: string) => void
     returnToActive: () => void
     editChapter: (id: string, patch: Partial<Chapter>) => void
+    editTurn: (chapterId: string, turnId: string, patch: Partial<Turn>) => void
+    deleteTurn: (chapterId: string, turnId: string) => void
     resummarizeChapter: (id: string) => void
     endChapterAndStartNew: () => void
     rewindToChapter: (id: string, mode: 'archive' | 'delete') => void
@@ -89,7 +90,6 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [activePanel, setActivePanel] = useState<PanelId | null>(null)
   const [showOutline, setShowOutline] = useState(false)
   const [showRewind, setShowRewind] = useState(false)
-  const [modelCtx, setModelCtx] = useState<Record<string, number>>({})
   const [showArc, setShowArc] = useState(false)
   const [showSaveAsScenario, setShowSaveAsScenario] = useState(false)
   const [pinScroll, setPinScroll] = useState(true)
@@ -121,7 +121,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   })
 
   const viewing = computed.viewingChapter
-  const viewingContent = viewing?.content || ''
+  const viewingContent = viewing ? renderChapterContent(viewing) : ''
+  const activeContent = computed.activeChapter ? renderChapterContent(computed.activeChapter) : ''
 
   // Auto-play TTS on new AI narration
   const seenNarrationId = useRef(0)
@@ -134,17 +135,16 @@ export default function Playing({ state, dispatch, setField, actions, computed }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastNarrationId])
 
-  // Speaker button: play the most recent AI narration (last paragraph block not starting with "> ")
+  // Speaker button: play the most recent AI narration.
   const lastAINarration = useMemo(() => {
     if (state.lastNarrationText.trim()) return state.lastNarrationText.trim()
-    const source = computed.activeChapter?.content || ''
-    const chunks = source.split(/\n\n/)
-    for (let i = chunks.length - 1; i >= 0; i--) {
-      const p = chunks[i].trim()
-      if (p && !p.startsWith('> ')) return p
+    const turns = computed.activeChapter?.turns || []
+    for (let i = turns.length - 1; i >= 0; i--) {
+      const r = turns[i].response.trim()
+      if (r) return r
     }
     return ''
-  }, [computed.activeChapter?.content, state.lastNarrationText])
+  }, [computed.activeChapter?.turns, state.lastNarrationText])
 
   const handleSpeakLast = () => {
     if (!lastAINarration) return
@@ -158,7 +158,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   // Swipe gesture for panels
   const rootRef = useRef<HTMLDivElement>(null)
-  const lastPanel = useRef<PanelId>('mem')
+  const lastPanel = useRef<PanelId>('story')
   const touchStart = useRef<{ x: number; y: number } | null>(null)
 
   const openPanel = (id: PanelId | null) => {
@@ -228,19 +228,6 @@ export default function Playing({ state, dispatch, setField, actions, computed }
     gallery.addImages(imgs, state.sessionId)
   }
 
-  // Fetch models once to learn each story model's ctx window.
-  useEffect(() => {
-    let alive = true
-    api.getModels().then(ms => {
-      if (!alive) return
-      const map: Record<string, number> = {}
-      for (const m of ms) map[m.id] = m.ctx || 0
-      setModelCtx(map)
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [])
-
-  const modelCtxMax = state.storyModel ? modelCtx[state.storyModel] || 128000 : 128000
   const promptTokens = useMemo(() => estimatePromptTokens(state), [state.chapters, state.lore, state.overview, state.secs, state.style])
   const budget = budgetLevel(promptTokens, state.effectiveCtxTokens)
   const pctUsed = state.effectiveCtxTokens > 0 ? Math.round((promptTokens / state.effectiveCtxTokens) * 100) : 0
@@ -275,12 +262,11 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 
       switch (e.key) {
-        case '1': openPanel(activePanel === 'mem' ? null : 'mem'); break
+        case '1': openPanel(activePanel === 'story' ? null : 'story'); break
         case '2': openPanel(activePanel === 'gallery' ? null : 'gallery'); break
         case '3': openPanel(activePanel === 'track' ? null : 'track'); break
         case '4': openPanel(activePanel === 'settings' ? null : 'settings'); break
-        case '5': openPanel(activePanel === 'ai' ? null : 'ai'); break
-        case '6': openPanel(activePanel === 'prompt' ? null : 'prompt'); break
+        case '5': openPanel(activePanel === 'prompt' ? null : 'prompt'); break
         case 'o': setShowOutline(s => !s); break
         case 'Escape': setActivePanel(null); setShowOutline(false); break
         case 'a': setShowArc(a => !a); break
@@ -298,10 +284,14 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   const streamingWords = state.streaming ? state.streaming.trim().split(/\s+/).length : 0
 
-  // Route story edits to the currently-viewed chapter.
-  const handleStoryChange = (content: string) => {
+  // Per-turn edits/deletes on the currently-viewed chapter.
+  const handleTurnEdit = (turnId: string, patch: Partial<Turn>) => {
     if (!viewing) return
-    actions.editChapter(viewing.id, { content })
+    actions.editTurn(viewing.id, turnId, patch)
+  }
+  const handleTurnDelete = (turnId: string) => {
+    if (!viewing) return
+    actions.deleteTurn(viewing.id, turnId)
   }
 
   const summariesAsText = useMemo(
@@ -368,19 +358,19 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       />
 
       {/* Panels */}
-      <AIPanel show={activePanel === 'ai'} onClose={() => setActivePanel(null)}
-        storyModel={state.storyModel} supportModel={state.supportModel} modelRoles={state.modelRoles} setField={setField}
-        onSwitch={openPanel} />
-
-      <MemoryPanel
-        show={activePanel === 'mem'} onClose={() => setActivePanel(null)}
+      <StoryPanel
+        show={activePanel === 'story'} onClose={() => setActivePanel(null)}
         lore={state.lore}
         dispatch={dispatch}
         galleryImages={gallery.images}
         onGenerateImage={(loreId) => openGenModal('lore', loreId)}
-        story={computed.activeChapter?.content || ''}
+        story={activeContent}
         overview={state.overview}
         summariesText={summariesAsText}
+        style={state.style}
+        cStyle={state.cStyle}
+        diff={state.diff}
+        setField={setField}
         onSwitch={openPanel}
       />
 
@@ -406,17 +396,17 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         show={activePanel === 'prompt'} onClose={() => setActivePanel(null)}
         onSwitch={openPanel}
         sessionId={state.sessionId}
-        hasActiveContent={!!(computed.activeChapter?.content || '').trim()}
+        hasActiveContent={!!activeContent.trim()}
       />
 
       <SettingsPanel
         show={activePanel === 'settings'} onClose={() => setActivePanel(null)}
-        style={state.style} cStyle={state.cStyle}
-        overview={state.overview} diff={state.diff}
-        effectiveCtxTokens={state.effectiveCtxTokens}
-        modelCtxMax={modelCtxMax}
-        setField={setField}
         onSwitch={openPanel}
+        storyModel={state.storyModel}
+        supportModel={state.supportModel}
+        modelRoles={state.modelRoles}
+        effectiveCtxTokens={state.effectiveCtxTokens}
+        setField={setField}
         displayPrefs={dp.prefs}
         onSetTheme={dp.setTheme}
         onSetFontFamily={dp.setFontFamily}
@@ -432,7 +422,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onClose={() => setShowGenModal(false)}
         onImagesGenerated={handleImagesGenerated}
         gameState={{
-          story: computed.activeChapter?.content || '',
+          story: activeContent,
           summaries: summariesAsText,
           lore: state.lore,
           overview: state.overview,
@@ -484,10 +474,11 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
       {/* Story */}
       <StoryArea
-        story={viewingContent}
+        turns={viewing?.turns || []}
         gen={state.gen && computed.isViewingActive}
         streaming={state.streaming}
-        onChange={handleStoryChange}
+        onTurnEdit={handleTurnEdit}
+        onTurnDelete={handleTurnDelete}
         pinScroll={pinScroll}
         onReadAloud={handleReadAloud}
       />
@@ -510,7 +501,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           </span>
         </div>
       )}
-      {(computed.activeChapter?.content.trim() || '') && !state.gen && !state.stUp && !state.summing && (
+      {activeContent.trim() && !state.gen && !state.stUp && !state.summing && (
         <div className="ib">
           <span>{computed.activeWordCount.toLocaleString()}w</span>
           {state.chapters.filter(c => c.status !== 'active').length > 0 && (

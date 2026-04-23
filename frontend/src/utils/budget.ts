@@ -1,4 +1,5 @@
 import type { GameState, Chapter } from '../types'
+import { renderChapterContent } from '../types'
 
 // Rough heuristic: ~4 chars per token in English prose.
 // This is intentionally imprecise — we just need a signal that scales monotonically.
@@ -33,7 +34,7 @@ export function estimatePromptTokens(state: Pick<GameState, 'chapters' | 'lore' 
   }
   for (const c of state.chapters) {
     if (childOfAct.has(c.id)) continue
-    if (c.status === 'active') total += estimateTokens(c.content)
+    if (c.status === 'active') total += estimateTokens(renderChapterContent(c))
     else if (c.summary) total += estimateTokens(c.summary)
   }
   // System prompt overhead (constant ~300 tokens)
@@ -55,5 +56,6 @@ export function budgetLevel(used: number, max: number): BudgetLevel {
 
 export function estimateActiveWordChunk(chapter: Chapter | undefined): number {
   if (!chapter) return 0
-  return chapter.content.trim() ? chapter.content.trim().split(/\s+/).length : 0
+  const text = renderChapterContent(chapter).trim()
+  return text ? text.split(/\s+/).length : 0
 }

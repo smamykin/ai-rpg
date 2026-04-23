@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import type { Turn } from '../types'
+import EditorModal from './EditorModal'
 import SelectionToolbar from './SelectionToolbar'
 import * as api from '../api'
 
@@ -8,31 +10,52 @@ function escapeHtml(s: string) {
 
 function formatInline(text: string): string {
   let s = escapeHtml(text)
-  // Bold: **text**
   s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  // Italic: *text* (not preceded/followed by *)
   s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
-  // Dialogue: "text" or \u201ctext\u201d
   s = s.replace(/["\u201c]([^"\u201c\u201d]+?)["\u201d]/g, '<span class="dq">\u201c$1\u201d</span>')
   return s
 }
 
+// Serialize a turn to the raw text form the user edits in the modal.
+function turnToText(t: Turn): string {
+  if (t.action) {
+    return t.response ? '> ' + t.action + '\n\n' + t.response : '> ' + t.action
+  }
+  return t.response
+}
+
+// Parse the edited raw text back into { action, response }. The first `> ` line
+// (if present, either at the start or only line) becomes the action; everything
+// else is the response.
+function textToTurnPatch(text: string): { action?: string; response: string } {
+  const trimmed = text.replace(/^\s+|\s+$/g, '')
+  if (trimmed.startsWith('> ')) {
+    const nlIdx = trimmed.indexOf('\n')
+    if (nlIdx === -1) {
+      return { action: trimmed.slice(2).trim(), response: '' }
+    }
+    const action = trimmed.slice(2, nlIdx).trim()
+    const response = trimmed.slice(nlIdx + 1).replace(/^\s+/, '')
+    return { action, response }
+  }
+  return { response: trimmed }
+}
+
 interface Props {
-  story: string
+  turns: Turn[]
   gen: boolean
   streaming: string
-  onChange: (story: string) => void
+  onTurnEdit: (turnId: string, patch: Partial<Turn>) => void
+  onTurnDelete: (turnId: string) => void
   pinScroll: boolean
   onReadAloud: (text: string) => void
 }
 
-export default function StoryArea({ story, gen, streaming, onChange, pinScroll, onReadAloud }: Props) {
-  const ta = useRef<HTMLTextAreaElement>(null)
+export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDelete, pinScroll, onReadAloud }: Props) {
   const rd = useRef<HTMLDivElement>(null)
-  const [editing, setEditing] = useState(false)
+  const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
   const [transforming, setTransforming] = useState(false)
 
-  // Scroll pinning during streaming
   useEffect(() => {
     if (!pinScroll || !gen) return
     const el = rd.current
@@ -41,75 +64,67 @@ export default function StoryArea({ story, gen, streaming, onChange, pinScroll, 
     }
   }, [streaming, gen, pinScroll])
 
-  // Focus textarea when entering edit mode
-  useEffect(() => {
-    if (editing && ta.current) {
-      ta.current.focus()
-      ta.current.scrollTop = ta.current.scrollHeight
-    }
-  }, [editing])
+  const editingTurn = editingTurnId ? turns.find(t => t.id === editingTurnId) : null
 
-  // Rendered paragraphs for read view
-  const paragraphs = useMemo(() => {
-    if (!story.trim()) return []
-    return story.split(/\n\n/).filter(p => p.trim())
-  }, [story])
+  const handleSave = useCallback((raw: string) => {
+    if (!editingTurnId) return
+    const patch = textToTurnPatch(raw)
+    onTurnEdit(editingTurnId, patch)
+    setEditingTurnId(null)
+  }, [editingTurnId, onTurnEdit])
 
-  // Replace selected text in story, then return to read-view
-  const handleReplace = useCallback((original: string, replacement: string) => {
-    // Try direct match first
-    let idx = story.indexOf(original)
-    if (idx === -1) {
-      // Try matching with smart quotes normalized to regular quotes
-      const normalized = original.replace(/[\u201c\u201d]/g, '"')
-      idx = story.indexOf(normalized)
-    }
-    if (idx !== -1) {
-      const matchStr = story.indexOf(original) !== -1 ? original : original.replace(/[\u201c\u201d]/g, '"')
-      onChange(story.slice(0, idx) + replacement + story.slice(idx + matchStr.length))
-    }
-    setEditing(false)
-  }, [story, onChange])
+  const handleDelete = useCallback(() => {
+    if (!editingTurnId) return
+    onTurnDelete(editingTurnId)
+    setEditingTurnId(null)
+  }, [editingTurnId, onTurnDelete])
 
-  // Handle click on read-view: only enter edit mode if no text is selected and not transforming
-  const handleClick = useCallback(() => {
+  const handleTurnClick = useCallback((turnId: string) => {
     if (gen || transforming) return
     const sel = window.getSelection()
     if (sel && !sel.isCollapsed) return
-    setEditing(true)
+    setEditingTurnId(turnId)
   }, [gen, transforming])
 
-  // Textarea for editing (only when not generating)
-  if (editing && !gen && !transforming) {
-    return (
-      <textarea
-        ref={ta}
-        className="sta"
-        value={story}
-        onChange={e => onChange(e.target.value)}
-        onBlur={() => setEditing(false)}
-        spellCheck
-      />
-    )
-  }
+  const handleReplace = useCallback((original: string, replacement: string) => {
+    // Find which turn contains the original text and patch only its response.
+    for (const t of turns) {
+      const haystack = t.response
+      let idx = haystack.indexOf(original)
+      if (idx === -1) {
+        const normalized = original.replace(/[\u201c\u201d]/g, '"')
+        idx = haystack.indexOf(normalized)
+        if (idx !== -1) {
+          onTurnEdit(t.id, { response: haystack.slice(0, idx) + replacement + haystack.slice(idx + normalized.length) })
+          return
+        }
+      }
+      if (idx !== -1) {
+        onTurnEdit(t.id, { response: haystack.slice(0, idx) + replacement + haystack.slice(idx + original.length) })
+        return
+      }
+    }
+  }, [turns, onTurnEdit])
 
-  // Read view (default + during generation)
   return (
     <>
-      <div
-        ref={rd}
-        className="rd"
-        onClick={handleClick}
-        style={gen || transforming ? undefined : { cursor: 'text' }}
-      >
-        {paragraphs.length === 0 && !gen && (
+      <div ref={rd} className="rd" style={gen || transforming ? undefined : { cursor: 'text' }}>
+        {turns.length === 0 && !gen && (
           <p className="rd-ph">Your adventure will appear here...</p>
         )}
-        {paragraphs.map((p, i) => {
-          if (p.startsWith('> ')) {
-            return <div key={i} className="pa" dangerouslySetInnerHTML={{ __html: formatInline(p.slice(2)) }} />
-          }
-          return <p key={i} dangerouslySetInnerHTML={{ __html: formatInline(p) }} />
+        {turns.map(t => {
+          const paragraphs = t.response.split(/\n\n/).filter(p => p.trim())
+          const cls = t.action ? 'tn' : 'tn tn-na'
+          return (
+            <div key={t.id} className={cls} onClick={() => handleTurnClick(t.id)}>
+              {t.action && (
+                <div className="pa" dangerouslySetInnerHTML={{ __html: formatInline(t.action) }} />
+              )}
+              {paragraphs.map((p, i) => (
+                <p key={i} dangerouslySetInnerHTML={{ __html: formatInline(p) }} />
+              ))}
+            </div>
+          )
         })}
         {!gen && (
           <SelectionToolbar
@@ -126,6 +141,15 @@ export default function StoryArea({ story, gen, streaming, onChange, pinScroll, 
           <span className="gd">&#x25cf;</span>
           Transforming text...
         </div>
+      )}
+      {editingTurn && (
+        <EditorModal
+          title={editingTurn.action ? '> ' + editingTurn.action.slice(0, 50) : 'Edit turn'}
+          value={turnToText(editingTurn)}
+          onSave={handleSave}
+          onClose={() => setEditingTurnId(null)}
+          extraActions={[{ label: 'Delete turn', onClick: handleDelete, danger: true }]}
+        />
       )}
     </>
   )

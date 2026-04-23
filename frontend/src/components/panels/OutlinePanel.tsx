@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Chapter } from '../../types'
-import { wordCount } from '../../types'
+import { wordCount, renderChapterContent } from '../../types'
+import * as api from '../../api'
 
 interface Props {
   show: boolean
@@ -43,7 +44,7 @@ export default function OutlinePanel({
   const [showActPicker, setShowActPicker] = useState(false)
 
   const active = chapters.find(c => c.id === activeChapterId)
-  const activeContent = active?.content || ''
+  const activeContent = active ? renderChapterContent(active) : ''
   const activeWords = wordCount(activeContent)
   const canEnd = !busy && activeContent.trim().length > 0
 
@@ -95,7 +96,7 @@ export default function OutlinePanel({
     const currentAct = c.status === 'act' ? ++actCounter : actCounter
     const title = titleOrFallback(c, currentLeaf, currentAct)
     const wordCountText = c.status === 'active'
-      ? `${wordCount(c.content).toLocaleString()}w`
+      ? `${wordCount(renderChapterContent(c)).toLocaleString()}w`
       : c.summary ? `~${wordCount(c.summary).toLocaleString()}w summary` : 'no summary'
     const cls = ['ol-it', isActive ? 'active' : '', isViewing ? 'viewing' : ''].filter(Boolean).join(' ')
     const expanded = c.status === 'act' ? !!expandedActs[c.id] : false
@@ -245,6 +246,28 @@ export default function OutlinePanel({
           <button className="b bs" onClick={() => { onSave(); onClose() }} style={{ justifyContent: 'flex-start' }}>Export JSON</button>
           <button className="b bs" onClick={() => { onExportMd(); onClose() }} style={{ justifyContent: 'flex-start' }}>Export MD</button>
           <button className="b bs" onClick={() => { onLoad(); onClose() }} style={{ justifyContent: 'flex-start' }}>Import JSON</button>
+        </div>
+
+        {/* Danger zone */}
+        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--bd)', paddingTop: '.75rem' }}>
+          <label className="lb" style={{ marginBottom: '.5rem', color: 'var(--dng)' }}>Danger zone</label>
+          <button
+            className="b bs"
+            onClick={async () => {
+              if (!window.confirm('Delete all sessions, scenarios, gallery images, and local preferences? This cannot be undone.')) return
+              if (!window.confirm('Really? Everything will be wiped and the app will reload.')) return
+              try {
+                await api.resetAllData()
+              } catch { /* ignore \u2014 we\u2019re wiping anyway */ }
+              for (let i = localStorage.length - 1; i >= 0; i--) {
+                const k = localStorage.key(i)
+                if (k && k.startsWith('ai-rpg-')) localStorage.removeItem(k)
+              }
+              location.reload()
+            }}
+            style={{ justifyContent: 'flex-start', width: '100%', color: 'var(--dng)', borderColor: 'var(--dng)' }}
+          >Clear all data</button>
+          <div className="hint" style={{ marginTop: '.3rem' }}>Deletes all sessions, scenarios, gallery images, and local preferences.</div>
         </div>
 
         {/* Archived chapters */}
