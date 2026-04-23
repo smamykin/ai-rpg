@@ -48,10 +48,11 @@ interface Props {
   onTurnEdit: (turnId: string, patch: Partial<Turn>) => void
   onTurnDelete: (turnId: string) => void
   pinScroll: boolean
+  scrollRequest?: number
   onReadAloud: (text: string) => void
 }
 
-export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDelete, pinScroll, onReadAloud }: Props) {
+export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDelete, pinScroll, scrollRequest, onReadAloud }: Props) {
   const rd = useRef<HTMLDivElement>(null)
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null)
   const [transforming, setTransforming] = useState(false)
@@ -63,6 +64,15 @@ export default function StoryArea({ turns, gen, streaming, onTurnEdit, onTurnDel
       el.scrollTop = el.scrollHeight
     }
   }, [streaming, gen, pinScroll])
+
+  // Imperative scroll-to-bottom (bumped when user re-engages pin or a new gen starts).
+  // Bypasses the 140px guard so a click always lands at the bottom.
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return }
+    const el = rd.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [scrollRequest])
 
   const editingTurn = editingTurnId ? turns.find(t => t.id === editingTurnId) : null
 

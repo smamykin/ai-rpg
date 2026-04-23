@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { LoreEntry, GalleryImage } from '../types'
 import { uid, LORE_TAGS } from '../types'
 import * as api from '../api'
@@ -50,7 +50,7 @@ function upsert(list: LoreEntry[], id: string, patch: Partial<LoreEntry>): LoreE
 export default function LoreEditor({ lore, onChange, galleryImages = [], onGenerateImage, aiContext }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cfmDelete, setCfmDelete] = useState(false)
-  const [lbImg, setLbImg] = useState<GalleryImage | null>(null)
+  const [lbIdx, setLbIdx] = useState<number | null>(null)
   const [showAiPanel, setShowAiPanel] = useState(false)
   const [aiInstructions, setAiInstructions] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
@@ -64,8 +64,8 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
 
   const selected = selectedId ? lore.find(l => l.id === selectedId) : null
 
-  const getLoreImage = (loreId: string) =>
-    galleryImages.find(i => i.loreEntryId === loreId)
+  const getLoreImages = (loreId: string) =>
+    galleryImages.filter(i => i.loreEntryId === loreId)
 
   const addNew = () => {
     const id = uid()
@@ -102,7 +102,7 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
         )}
 
         {lore.map(l => {
-          const img = getLoreImage(l.id)
+          const img = getLoreImages(l.id)[0]
           const tagColor = TAG_COLORS[l.tag] || 'var(--bd)'
           return (
             <div
@@ -136,7 +136,7 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
   }
 
   // Detail view
-  const img = getLoreImage(selected.id)
+  const imgs = getLoreImages(selected.id)
   const story = aiContext?.story ?? ''
   const overview = aiContext?.overview ?? ''
   const summaries = aiContext?.summaries ?? ''
@@ -148,12 +148,10 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
         &#x2190; Back
       </button>
 
-      {(img || onGenerateImage) && (
+      {(imgs.length > 0 || onGenerateImage) && (
         <>
-          {img ? (
-            <div className="ld-img" onClick={() => setLbImg(img)} style={{ cursor: 'pointer' }}>
-              <img src={img.url} alt={selected.name} />
-            </div>
+          {imgs.length > 0 ? (
+            <LoreImageCarousel images={imgs} onOpen={setLbIdx} alt={selected.name} />
           ) : (
             <div className="ld-img"><span className="ld-ph">No image</span></div>
           )}
@@ -321,14 +319,72 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
           onClick={() => setCfmDelete(true)}>Delete Entry</button>
       )}
 
-      {lbImg && (
+      {lbIdx !== null && imgs[lbIdx] && (
         <Lightbox
-          images={[lbImg]}
-          index={0}
-          onClose={() => setLbImg(null)}
-          onNavigate={() => {}}
+          images={imgs}
+          index={lbIdx}
+          onClose={() => setLbIdx(null)}
+          onNavigate={setLbIdx}
         />
       )}
     </>
+  )
+}
+
+interface CarouselProps {
+  images: GalleryImage[]
+  onOpen: (index: number) => void
+  alt?: string
+}
+
+function LoreImageCarousel({ images, onOpen, alt }: CarouselProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [idx, setIdx] = useState(0)
+  const multi = images.length > 1
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => {
+      const w = el.clientWidth
+      if (w === 0) return
+      const next = Math.round(el.scrollLeft / w)
+      setIdx(next)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const goTo = (i: number) => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="ld-car">
+      <div className="ld-car-track" ref={scrollRef}>
+        {images.map((img, i) => (
+          <div key={img.id} className="ld-car-slide" onClick={() => onOpen(i)}>
+            <img src={img.url} alt={alt || ''} />
+          </div>
+        ))}
+      </div>
+      {multi && (
+        <>
+          <div className="ld-car-count">{idx + 1} / {images.length}</div>
+          <div className="ld-car-dots">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                className={`ld-car-dot${i === idx ? ' on' : ''}`}
+                onClick={() => goTo(i)}
+                aria-label={`Image ${i + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

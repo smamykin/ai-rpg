@@ -36,6 +36,8 @@ body {
   height: 100dvh;
   background: var(--bg);
   overflow: hidden;
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
 }
 
 /* Buttons */
@@ -406,6 +408,53 @@ select {
 .ld-img { width: 100%; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--bd); margin-bottom: .6rem; display: flex; align-items: center; justify-content: center; }
 .ld-img img { max-width: 100%; max-height: 300px; object-fit: contain; display: block; border-radius: 8px; }
 .ld-ph { color: var(--mt); font-size: .82rem; text-align: center; padding: 2rem 0; }
+
+/* Lore image carousel */
+.ld-car { position: relative; width: 100%; margin-bottom: .6rem; }
+.ld-car-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  overscroll-behavior-x: contain;
+}
+.ld-car-track::-webkit-scrollbar { display: none; }
+.ld-car-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  min-height: 160px;
+}
+.ld-car-slide img { max-width: 100%; max-height: 300px; object-fit: contain; display: block; border-radius: 8px; }
+.ld-car-count {
+  position: absolute;
+  top: .4rem;
+  right: .5rem;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: .7rem;
+  padding: .15rem .45rem;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.ld-car-dots { display: flex; justify-content: center; gap: .3rem; margin-top: .4rem; }
+.ld-car-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bd);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background .15s, transform .15s;
+}
+.ld-car-dot.on { background: var(--ac); transform: scale(1.3); }
 
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }

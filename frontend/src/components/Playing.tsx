@@ -95,6 +95,14 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [showArc, setShowArc] = useState(false)
   const [showSaveAsScenario, setShowSaveAsScenario] = useState(false)
   const [pinScroll, setPinScroll] = useState(true)
+  const [scrollReq, setScrollReq] = useState(0)
+
+  const togglePin = () => {
+    setPinScroll(p => {
+      if (!p) setScrollReq(r => r + 1)
+      return !p
+    })
+  }
 
   // Gallery
   const [showGenModal, setShowGenModal] = useState(false)
@@ -173,7 +181,10 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   const prevGen = useRef(false)
   useEffect(() => {
-    if (state.gen && !prevGen.current) setPinScroll(true)
+    if (state.gen && !prevGen.current) {
+      setPinScroll(true)
+      setScrollReq(r => r + 1)
+    }
     prevGen.current = state.gen
   }, [state.gen])
 
@@ -187,26 +198,24 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       if (!touchStart.current) return
       const dx = e.changedTouches[0].clientX - touchStart.current.x
       const dy = e.changedTouches[0].clientY - touchStart.current.y
-      const startX = touchStart.current.x
       touchStart.current = null
       if (Math.abs(dy) > Math.abs(dx)) return
-      const w = window.innerWidth
-      // Swipe left from right edge → open session panel
-      if (dx < -60 && startX > w - 35 && !activePanel && !showOutline) {
+      // Swipe left → open session panel
+      if (dx < -80 && !activePanel && !showOutline) {
         openPanel(lastPanel.current)
         return
       }
-      // Swipe right from left edge → open outline
-      if (dx > 60 && startX < 35 && !showOutline && !activePanel) {
+      // Swipe right → open outline
+      if (dx > 80 && !showOutline && !activePanel) {
         setShowOutline(true)
         return
       }
       // Swipe right while right panel open → close
-      if (dx > 60 && activePanel) {
+      if (dx > 80 && activePanel) {
         setActivePanel(null)
       }
       // Swipe left while outline open → close
-      if (dx < -60 && showOutline) {
+      if (dx < -80 && showOutline) {
         setShowOutline(false)
       }
     }
@@ -500,6 +509,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onTurnEdit={handleTurnEdit}
         onTurnDelete={handleTurnDelete}
         pinScroll={pinScroll}
+        scrollRequest={scrollReq}
         onReadAloud={handleReadAloud}
       />
 
@@ -520,9 +530,9 @@ export default function Playing({ state, dispatch, setField, actions, computed }
             <span style={{ marginLeft: 'auto', display: 'flex', gap: '.3rem' }}>
               <button
                 className={`b bs sp${pinScroll ? ' ba' : ''}`}
-                onClick={(e) => { e.stopPropagation(); setPinScroll(p => !p) }}
-                title={pinScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
-              >{pinScroll ? '\u{1F4CC}' : '\u{1F4CC}'}</button>
+                onClick={(e) => { e.stopPropagation(); togglePin() }}
+                title={pinScroll ? 'Following — tap to detach' : 'Detached — tap to jump to bottom'}
+              >{pinScroll ? '\u{1F4CC}' : '\u{2B07}'}</button>
             </span>
           </div>
           {reasoningOpen && state.streamingReasoning && (
