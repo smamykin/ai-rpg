@@ -40,11 +40,13 @@ type ChatRequest struct {
 	MaxTokens int     `json:"max_tokens"`
 	Stream   bool      `json:"stream"`
 	Stop     []string  `json:"stop,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 }
 
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	Reasoning string `json:"reasoning,omitempty"`
 }
 
 type ChatResponse struct {
@@ -65,10 +67,28 @@ type Model struct {
 }
 
 type ModelResponse struct {
-	ID      string  `json:"id"`
-	Name    string  `json:"name,omitempty"`
-	Ctx     int      `json:"ctx"`
-	Price   *float64 `json:"price"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name,omitempty"`
+	Ctx              int      `json:"ctx"`
+	Price            *float64 `json:"price"`
+	SupportsThinking bool     `json:"supportsThinking"`
+}
+
+// DetectsThinking returns true if the model ID matches a known reasoning-capable
+// pattern. Mirrors the heuristic in frontend/src/types.ts (detectThinkingModel).
+func DetectsThinking(modelID string) bool {
+	s := strings.ToLower(modelID)
+	patterns := []string{
+		"gpt-5", "o1-", "o3-", "o4-",
+		":thinking", "-thinking",
+		"deepseek-r1", "qwen3-thinking", "grok-4-reasoning",
+	}
+	for _, p := range patterns {
+		if strings.Contains(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Image generation types.
@@ -181,12 +201,15 @@ func (c *Client) FetchImageModels(ctx context.Context) ([]ImageModel, error) {
 	return models, nil
 }
 
-// Complete sends a non-streaming chat completion request.
-func (c *Client) Complete(ctx context.Context, model, system, user string, maxTokens int) (string, error) {
+// Complete sends a non-streaming chat completion request. Pass effort="" (or "none")
+// to disable reasoning; any other value enables thinking on capable models. Reasoning
+// content from the response is discarded — only the answer text is returned.
+func (c *Client) Complete(ctx context.Context, model, system, user string, maxTokens int, effort string) (string, error) {
 	req := ChatRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
 		Stream:    false,
+		ReasoningEffort: effort,
 		Messages: []Message{
 			{Role: "system", Content: system},
 			{Role: "user", Content: user},
@@ -227,17 +250,20 @@ func (c *Client) Complete(ctx context.Context, model, system, user string, maxTo
 	return chatResp.Choices[0].Message.Content, nil
 }
 
-// StreamCallback is called for each accumulated chunk of streamed text.
-type StreamCallback func(accumulated string) error
+// StreamCallback is called whenever the running content or reasoning total grows.
+// Both args are running totals; either may be empty on a given tick.
+type StreamCallback func(content, reasoning string) error
 
-// CompleteStream sends a streaming chat completion and calls onChunk with accumulated text.
-// It returns the final full text.
-func (c *Client) CompleteStream(ctx context.Context, model, system, user string, maxTokens int, stops []string, onChunk StreamCallback) (string, error) {
+// CompleteStream sends a streaming chat completion and calls onChunk with the
+// accumulated content and reasoning totals. Returns the final full content text
+// (reasoning is delivered to the callback only, not returned).
+func (c *Client) CompleteStream(ctx context.Context, model, system, user string, maxTokens int, effort string, stops []string, onChunk StreamCallback) (string, error) {
 	req := ChatRequest{
 		Model:     model,
 		MaxTokens: maxTokens,
 		Stream:    true,
 		Stop:      stops,
+		ReasoningEffort: effort,
 		Messages: []Message{
 			{Role: "system", Content: system},
 			{Role: "user", Content: user},
@@ -271,7 +297,10 @@ func (c *Client) CompleteStream(ctx context.Context, model, system, user string,
 	}
 
 	scanner := bufio.NewScanner(resp.Body)
+	// Default scanner buffer is 64KB; reasoning chunks can occasionally exceed that.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var full strings.Builder
+	var reasoning strings.Builder
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -288,22 +317,28 @@ func (c *Client) CompleteStream(ctx context.Context, model, system, user string,
 			continue
 		}
 
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta != nil {
-			delta := chunk.Choices[0].Delta.Content
-			if delta != "" {
-				full.WriteString(delta)
+		if len(chunk.Choices) == 0 || chunk.Choices[0].Delta == nil {
+			continue
+		}
+		delta := chunk.Choices[0].Delta
+		grew := false
+		if delta.Reasoning != "" {
+			reasoning.WriteString(delta.Reasoning)
+			grew = true
+		}
+		if delta.Content != "" {
+			full.WriteString(delta.Content)
+			grew = true
 
-				// Check for ambient outro marker
-				if strings.Contains(full.String(), "# Ambient Outro") {
-					text := strings.Split(full.String(), "# Ambient Outro")[0]
-					return text, nil
-				}
-
-				if onChunk != nil {
-					if err := onChunk(full.String()); err != nil {
-						return full.String(), err
-					}
-				}
+			// Check for ambient outro marker (content only).
+			if strings.Contains(full.String(), "# Ambient Outro") {
+				text := strings.Split(full.String(), "# Ambient Outro")[0]
+				return text, nil
+			}
+		}
+		if grew && onChunk != nil {
+			if err := onChunk(full.String(), reasoning.String()); err != nil {
+				return full.String(), err
 			}
 		}
 	}
@@ -353,9 +388,10 @@ func (c *Client) FetchModels(ctx context.Context) ([]ModelResponse, error) {
 	models := make([]ModelResponse, 0, len(raw.Data))
 	for _, m := range raw.Data {
 		mr := ModelResponse{
-			ID:   m.ID,
-			Name: m.Name,
-			Ctx:  m.ContextLength,
+			ID:               m.ID,
+			Name:             m.Name,
+			Ctx:              m.ContextLength,
+			SupportsThinking: DetectsThinking(m.ID),
 		}
 		if mr.Name == "" {
 			mr.Name = m.ID

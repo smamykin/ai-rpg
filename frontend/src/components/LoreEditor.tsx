@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { LoreEntry, GalleryImage } from '../types'
 import { uid, LORE_TAGS } from '../types'
 import * as api from '../api'
+import type { LoreLength, LoreMode } from '../api'
 import Lightbox from './Lightbox'
 import SuggestNameButton from './SuggestNameButton'
 import ExpandableTextarea from './ExpandableTextarea'
@@ -15,6 +16,18 @@ const TAG_COLORS: Record<string, string> = {
   creature: 'var(--crt)',
   other: 'var(--bd)',
 }
+
+const LORE_LENGTHS: { value: LoreLength; label: string }[] = [
+  { value: 'concise', label: 'Concise' },
+  { value: 'descriptive', label: 'Descriptive' },
+  { value: 'full', label: 'Full' },
+]
+
+const LORE_MODES: { value: LoreMode; label: string }[] = [
+  { value: 'extract', label: 'Extract' },
+  { value: 'enhance', label: 'Enhance' },
+  { value: 'creative', label: 'Creative' },
+]
 
 export interface LoreEditorAIContext {
   story?: string
@@ -46,6 +59,8 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
   const [aiCtxSummaries, setAiCtxSummaries] = useState(true)
   const [aiCtxLore, setAiCtxLore] = useState(true)
   const [aiCtxOverview, setAiCtxOverview] = useState(true)
+  const [aiLength, setAiLength] = useState<LoreLength>('descriptive')
+  const [aiMode, setAiMode] = useState<LoreMode>('enhance')
 
   const selected = selectedId ? lore.find(l => l.id === selectedId) : null
 
@@ -210,6 +225,30 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
             {showAiPanel && (
               <div style={{ border: '1px solid var(--bd)', borderRadius: '8px', padding: '.5rem', marginTop: '.4rem', background: 'var(--bg)' }}>
                 <div className="gr" style={{ marginBottom: '.5rem' }}>
+                  <label className="lb">Length</label>
+                  <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+                    {LORE_LENGTHS.map(l => (
+                      <button
+                        key={l.value}
+                        className={`b bs${aiLength === l.value ? ' ba' : ''}`}
+                        onClick={() => setAiLength(l.value)}
+                      >{l.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="gr" style={{ marginBottom: '.5rem' }}>
+                  <label className="lb">Mode</label>
+                  <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+                    {LORE_MODES.map(m => (
+                      <button
+                        key={m.value}
+                        className={`b bs${aiMode === m.value ? ' ba' : ''}`}
+                        onClick={() => setAiMode(m.value)}
+                      >{m.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="gr" style={{ marginBottom: '.5rem' }}>
                   <label className="lb">Instructions (optional)</label>
                   <ExpandableTextarea
                     className="mt"
@@ -242,7 +281,7 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
                     }
                     if (aiCtxOverview && overview) ctx.overview = overview
                     try {
-                      const text = await api.generateLore(selected.name.trim(), selected.tag, aiInstructions.trim(), ctx)
+                      const text = await api.generateLore(selected.name.trim(), selected.tag, aiInstructions.trim(), ctx, aiLength, aiMode)
                       update(selected.id, { text })
                     } catch (e) {
                       setAiError((e as Error).message || 'Failed to generate')

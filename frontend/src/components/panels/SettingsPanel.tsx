@@ -25,6 +25,7 @@ interface Props {
   visibleTabs?: PanelId[]
   storyModel: string
   supportModel: string
+  reasoningEffort?: string
   modelRoles?: Record<string, string>
   effectiveCtxTokens: number
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
@@ -40,7 +41,7 @@ interface Props {
 
 export default function SettingsPanel({
   show, onClose, onSwitch, visibleTabs,
-  storyModel, supportModel, modelRoles,
+  storyModel, supportModel, reasoningEffort, modelRoles,
   effectiveCtxTokens, setField,
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize,
   tts, dispatch, ttsPlaying, onStopTTS,
@@ -135,6 +136,21 @@ export default function SettingsPanel({
             )}
           </div>
           <div className="hint">Default fallback for all non-story tasks. Individual tasks below can override.</div>
+        </div>
+
+        <div className="gr">
+          <label className="lb">Reasoning effort</label>
+          <select
+            value={reasoningEffort || 'none'}
+            onChange={e => setField('reasoningEffort', e.target.value)}
+          >
+            <option value="none">Off</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="xhigh">Extra high</option>
+          </select>
+          <div className="hint">For thinking models (gpt-5, o1, deepseek-r1, claude :thinking variants). Reasoning tokens count as output tokens.</div>
         </div>
 
         <div className="gr">

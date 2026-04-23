@@ -19,6 +19,9 @@ interface Props {
   canSpeak: boolean
   ttsBusy: boolean
   onStopTTS: () => void
+  thinkingSupported: boolean
+  thinkingOn: boolean
+  onToggleThinking: () => void
 }
 
 export default function ActionInput({
@@ -26,6 +29,7 @@ export default function ActionInput({
   showArc, onToggleArc, arc, onArcChange,
   secsLength, onShowTracking,
   onSpeak, canSpeak, ttsBusy, onStopTTS,
+  thinkingSupported, thinkingOn, onToggleThinking,
 }: Props) {
   const [action, setAction] = useState('')
   const blocked = busy ?? gen
@@ -91,6 +95,14 @@ export default function ActionInput({
             <button className="b bs" onClick={onSpeak} disabled={!canSpeak} title="Read last narration">&#x1f50a;</button>
           )}
           <button className={`b bs${showArc ? ' ba' : ''}`} onClick={onToggleArc}>&#x1f3af;</button>
+          {thinkingSupported && (
+            <button
+              className={`b bs${thinkingOn ? ' ba' : ''}`}
+              onClick={onToggleThinking}
+              disabled={blocked}
+              title={thinkingOn ? 'Thinking on (click to disable)' : 'Thinking off (click to enable)'}
+            >&#x1f9e0;</button>
+          )}
           <div style={{ flex: 1 }} />
           {secsLength === 0 && story.length > 100 && (
             <button className="b bs" onClick={onShowTracking} style={{ color: 'var(--ac)' }}>Track</button>

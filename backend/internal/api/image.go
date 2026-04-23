@@ -135,7 +135,7 @@ Rules:
 		}
 	}
 
-	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), 500)
+	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), 500, "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

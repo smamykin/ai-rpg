@@ -8,11 +8,12 @@ interface State extends GameState {
   phase: Phase
   gen: boolean
   streaming: string
+  streamingReasoning: string
   err: string
   summing: boolean
   stUp: boolean
   loaded: boolean
-  genStage: 'thinking' | 'writing' | 'stats' | 'summarizing' | null
+  genStage: 'sending' | 'thinking' | 'writing' | 'stats' | 'summarizing' | null
   saveStatus: 'idle' | 'saving' | 'saved'
   lastNarrationId: number
   lastNarrationText: string
@@ -23,6 +24,7 @@ type Action =
   | { type: 'SET_PHASE'; phase: Phase }
   | { type: 'SET_GEN'; gen: boolean }
   | { type: 'SET_STREAMING'; text: string }
+  | { type: 'SET_STREAMING_REASONING'; text: string }
   | { type: 'SET_ERR'; err: string }
   | { type: 'SET_SUMMING'; summing: boolean }
   | { type: 'SET_STUP'; stUp: boolean }
@@ -63,6 +65,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, gen: action.gen }
     case 'SET_STREAMING':
       return { ...state, streaming: action.text }
+    case 'SET_STREAMING_REASONING':
+      return { ...state, streamingReasoning: action.text }
     case 'SET_ERR':
       return { ...state, err: action.err }
     case 'SET_SUMMING':
@@ -112,16 +116,22 @@ function reducer(state: State, action: Action): State {
 
     case 'LOAD_STATE': {
       const loaded = action.state
-      const active = loaded.chapters?.find(c => c.id === loaded.activeChapterId) || loaded.chapters?.find(c => c.status === 'active')
-      const hasPlayContent = !!(loaded.overview || (active && active.turns && active.turns.length > 0))
+      // Backend omits empty turns arrays; normalize so callers can iterate freely.
+      const chapters = (loaded.chapters || []).map(c => ({ ...c, turns: c.turns || [] }))
+      const archivedChapters = (loaded.archivedChapters || []).map(c => ({ ...c, turns: c.turns || [] }))
+      const active = chapters.find(c => c.id === loaded.activeChapterId) || chapters.find(c => c.status === 'active')
+      const hasPlayContent = !!(loaded.overview || (active && active.turns.length > 0))
       return {
         ...state,
         ...loaded,
+        chapters,
+        archivedChapters,
         tts: loaded.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
         phase: hasPlayContent ? 'playing' : 'setup',
         loaded: true,
         gen: false,
         streaming: '',
+        streamingReasoning: '',
         err: '',
         genStage: null,
       }
@@ -134,6 +144,7 @@ function reducer(state: State, action: Action): State {
         loaded: true,
         gen: false,
         streaming: '',
+        streamingReasoning: '',
         err: '',
         summing: false,
         stUp: false,
@@ -148,6 +159,7 @@ function reducer(state: State, action: Action): State {
         phase: 'setup',
         gen: false,
         streaming: '',
+        streamingReasoning: '',
         err: '',
         summing: false,
         stUp: false,
@@ -184,6 +196,7 @@ const initialState: State = {
   phase: 'setup',
   gen: false,
   streaming: '',
+  streamingReasoning: '',
   err: '',
   summing: false,
   stUp: false,
@@ -304,11 +317,12 @@ export function useGameState() {
     if (!active) return
 
     dispatch({ type: 'SET_GEN', gen: true })
-    dispatch({ type: 'SET_GEN_STAGE', stage: 'thinking' })
+    dispatch({ type: 'SET_GEN_STAGE', stage: 'sending' })
     dispatch({ type: 'SET_ERR', err: '' })
     dispatch({ type: 'SET_STREAMING', text: '' })
+    dispatch({ type: 'SET_STREAMING_REASONING', text: '' })
 
-    const priorTurns = baseTurns ?? active.turns
+    const priorTurns = baseTurns ?? active.turns ?? []
     // The "pending" turn is where streaming text lands. For an action we create a
     // fresh turn with the player's action; for open/continue it has no action.
     const pendingId = newTurnId()
@@ -342,6 +356,10 @@ export function useGameState() {
           const updated: Turn[] = initialTurns.map(t => t.id === pendingId ? { ...t, response: text } : t)
           dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: updated } })
         },
+        onReasoning: (text) => {
+          dispatch({ type: 'SET_GEN_STAGE', stage: 'thinking' })
+          dispatch({ type: 'SET_STREAMING_REASONING', text })
+        },
         onDone: (text) => {
           const trimmed = text.trim()
           // If the pending turn has no action and no response, drop it (empty generation).
@@ -350,6 +368,7 @@ export function useGameState() {
             : initialTurns.map(t => t.id === pendingId ? { ...t, response: trimmed } : t)
           dispatch({ type: 'UPDATE_CHAPTER', id: active.id, patch: { turns: finalTurns } })
           dispatch({ type: 'SET_STREAMING', text: '' })
+          dispatch({ type: 'SET_STREAMING_REASONING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
           if (trimmed) dispatch({ type: 'SET_LAST_NARRATION', text: trimmed })
@@ -375,6 +394,7 @@ export function useGameState() {
         onError: (error) => {
           dispatch({ type: 'SET_ERR', err: error.slice(0, 300) })
           dispatch({ type: 'SET_STREAMING', text: '' })
+          dispatch({ type: 'SET_STREAMING_REASONING', text: '' })
           dispatch({ type: 'SET_GEN', gen: false })
           dispatch({ type: 'SET_GEN_STAGE', stage: null })
           // Drop the pending turn so it's not orphaned with empty response.
@@ -438,6 +458,7 @@ export function useGameState() {
     abortRef.current?.abort()
     setTimeout(() => {
       dispatch({ type: 'SET_STREAMING', text: '' })
+      dispatch({ type: 'SET_STREAMING_REASONING', text: '' })
       dispatch({ type: 'SET_GEN', gen: false })
       dispatch({ type: 'SET_GEN_STAGE', stage: null })
       dispatch({ type: 'SET_ERR', err: 'Stopped' })

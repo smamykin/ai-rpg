@@ -58,6 +58,7 @@ export interface GameState {
   cStyle: string
   storyModel: string
   supportModel: string
+  reasoningEffort?: string
   arc: string
   diff: string
   lore: LoreEntry[]
@@ -170,11 +171,20 @@ export function validateScenario(obj: unknown): Scenario | null {
 export const MODEL_ROLES = ['summary', 'imagePrompt', 'loreGen', 'scenarioPolish', 'naming'] as const
 export type ModelRole = typeof MODEL_ROLES[number]
 
+export const REASONING_EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh'] as const
+export type ReasoningEffort = typeof REASONING_EFFORTS[number]
+
+// Mirrors backend nanogpt.DetectsThinking — keep the patterns in sync.
+export function detectThinkingModel(id: string): boolean {
+  return /(gpt-5|o1-|o3-|o4-|:thinking|-thinking|deepseek-r1|qwen3-thinking|grok-4-reasoning)/i.test(id || '')
+}
+
 export interface ModelInfo {
   id: string
   name: string
   ctx: number
   price: number | null
+  supportsThinking: boolean
 }
 
 export interface ImageModelInfo {

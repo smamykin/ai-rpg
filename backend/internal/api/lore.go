@@ -11,7 +11,27 @@ type GenerateLoreRequest struct {
 	Name         string          `json:"name"`
 	Tag          string          `json:"tag"`
 	Instructions string          `json:"instructions"`
+	Length       string          `json:"length"` // "concise" | "descriptive" | "full"
+	Mode         string          `json:"mode"`   // "extract" | "enhance" | "creative"
 	Context      GenerateLoreCtx `json:"context"`
+}
+
+var loreLengthDirectives = map[string]string{
+	"concise":     "2-4 sentences, densest possible.",
+	"descriptive": "1-2 paragraphs with room for detail.",
+	"full":        "3-5 paragraphs, encyclopedia-style, cover every focus area fully. Use short sub-labels (History, Appearance, Role, etc.) if it helps organize.",
+}
+
+var loreLengthMaxTokens = map[string]int{
+	"concise":     300,
+	"descriptive": 600,
+	"full":        1200,
+}
+
+var loreModeDirectives = map[string]string{
+	"extract":  "Use ONLY facts in the context tags. If a focus area has no support, say what is unclear or unknown. Invent nothing.",
+	"enhance":  "Start from what the context tags say, then enrich with plausible, genre-fitting invention. Never contradict the context. Every fact in the context must survive; additions must be consistent.",
+	"creative": "Invent the entry. Context tags are constraints — do not contradict them — but feel free to introduce new, fitting details.",
 }
 
 type GenerateLoreCtx struct {
@@ -41,15 +61,11 @@ func (h *Handlers) GenerateLore(w http.ResponseWriter, r *http.Request) {
 	state, _ := h.sessions.LoadCurrent()
 	model := h.resolveModel("loreGen", state)
 
-	systemPrompt := `You are a lore keeper for a text-based RPG. Extract and compile everything known about the subject from the provided story context.
+	systemPrompt := `You are a lore keeper for a text-based RPG. You produce a single lore entry based on the provided context tags (<overview>, <story_summaries>, <recent_story>, <existing_lore>) and any <example> shown. Follow the <task> exactly. <user_instructions>, when present, override every rule.
 
 Rules:
-- Output ONLY the lore entry text, nothing else.
-- Write in present tense, encyclopedic style.
-- Be concise but thorough. Aim for 2-5 sentences.
-- Do NOT invent facts not supported by the context.
-- If little is known, write what IS known and note what remains unclear.
-- User instructions (when present) override every rule above.`
+- Output ONLY the lore entry text — no labels, no headers, no commentary.
+- Write in present tense, encyclopedic style.`
 
 	focusByTag := map[string]string{
 		"character": "Role or occupation, appearance, demeanor, relationships, goals, secrets.",
@@ -61,45 +77,63 @@ Rules:
 		"other":     "Whatever is most salient about the subject.",
 	}
 
-	var sb strings.Builder
-	if strings.TrimSpace(req.Name) != "" {
-		fmt.Fprintf(&sb, "Create a lore entry for: %s (category: %s)\n", req.Name, req.Tag)
-	} else {
-		fmt.Fprintf(&sb, "Create a lore entry (category: %s)\n", req.Tag)
+	length := strings.TrimSpace(req.Length)
+	if _, ok := loreLengthDirectives[length]; !ok {
+		length = "descriptive"
+	}
+	mode := strings.TrimSpace(req.Mode)
+	if _, ok := loreModeDirectives[mode]; !ok {
+		mode = "enhance"
 	}
 
-	if focus, ok := focusByTag[req.Tag]; ok {
-		fmt.Fprintf(&sb, "Focus areas: %s\n", focus)
+	var sb strings.Builder
+
+	// Context blocks first.
+	if req.Context.Overview != "" {
+		fmt.Fprintf(&sb, "<overview>\n%s\n</overview>\n\n", req.Context.Overview)
+	}
+	if req.Context.Summaries != "" {
+		fmt.Fprintf(&sb, "<story_summaries>\n%s\n</story_summaries>\n\n", req.Context.Summaries)
+	}
+	if req.Context.RecentStory != "" {
+		fmt.Fprintf(&sb, "<recent_story>\n%s\n</recent_story>\n\n", req.Context.RecentStory)
+	}
+	if len(req.Context.LoreEntries) > 0 {
+		sb.WriteString("<existing_lore>\n")
+		for _, l := range req.Context.LoreEntries {
+			fmt.Fprintf(&sb, "**%s**: %s\n", l.Name, l.Text)
+		}
+		sb.WriteString("</existing_lore>\n\n")
 	}
 
 	// One-shot example — only for character entries, where a concrete template lifts quality the most.
 	if req.Tag == "character" {
-		sb.WriteString("\nExample:\n")
+		sb.WriteString("<example>\n")
 		sb.WriteString("Request: Create a lore entry for Mira (character)\n")
 		sb.WriteString("Entry: Mira is a former caravan guard turned courier in the lower district. Lean and quick, with a scar along her left jaw from a roadside ambush she refuses to discuss. Loyal to few but fiercely so; owes a debt to the innkeeper Calum. Wants out of the city but cannot leave until the debt is paid.\n")
+		sb.WriteString("</example>\n\n")
 	}
 
+	// Task block.
+	sb.WriteString("<task>\n")
+	if strings.TrimSpace(req.Name) != "" {
+		fmt.Fprintf(&sb, "Create a lore entry for: %s (category: %s).\n", req.Name, req.Tag)
+	} else {
+		fmt.Fprintf(&sb, "Create a lore entry (category: %s).\n", req.Tag)
+	}
+	if focus, ok := focusByTag[req.Tag]; ok {
+		fmt.Fprintf(&sb, "Focus areas: %s\n", focus)
+	}
+	fmt.Fprintf(&sb, "Length: %s\n", loreLengthDirectives[length])
+	fmt.Fprintf(&sb, "Approach: %s\n", loreModeDirectives[mode])
+	sb.WriteString("</task>\n")
+
+	// User instructions last so they override everything.
 	if strings.TrimSpace(req.Instructions) != "" {
-		fmt.Fprintf(&sb, "\nAdditional instructions: %s\n", req.Instructions)
+		fmt.Fprintf(&sb, "\n<user_instructions>\n%s\n</user_instructions>\n", strings.TrimSpace(req.Instructions))
 	}
 
-	if req.Context.Overview != "" {
-		fmt.Fprintf(&sb, "\n--- Adventure Overview ---\n%s\n", req.Context.Overview)
-	}
-	if req.Context.Summaries != "" {
-		fmt.Fprintf(&sb, "\n--- Story Summaries ---\n%s\n", req.Context.Summaries)
-	}
-	if req.Context.RecentStory != "" {
-		fmt.Fprintf(&sb, "\n--- Recent Story ---\n%s\n", req.Context.RecentStory)
-	}
-	if len(req.Context.LoreEntries) > 0 {
-		sb.WriteString("\n--- Existing Lore ---\n")
-		for _, l := range req.Context.LoreEntries {
-			fmt.Fprintf(&sb, "**%s**: %s\n", l.Name, l.Text)
-		}
-	}
-
-	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), 500)
+	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), loreLengthMaxTokens[length], "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -162,29 +196,17 @@ func (h *Handlers) SuggestName(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var sb strings.Builder
+	fmt.Fprintf(&sb, "Suggest a name for this %s.\n", kind)
 	if req.Tag != "" {
 		fmt.Fprintf(&sb, "Category: %s\n", req.Tag)
 	}
-	if strings.TrimSpace(req.Text) != "" {
-		fmt.Fprintf(&sb, "\nContent:\n%s\n", strings.TrimSpace(req.Text))
-	}
-	if req.Context.Overview != "" {
-		fmt.Fprintf(&sb, "\n--- Adventure Overview ---\n%s\n", req.Context.Overview)
-	}
-	if req.Context.RecentStory != "" {
-		fmt.Fprintf(&sb, "\n--- Recent Story ---\n%s\n", req.Context.RecentStory)
-	}
-	if len(req.Context.LoreEntries) > 0 {
-		sb.WriteString("\n--- Existing Lore ---\n")
-		for _, l := range req.Context.LoreEntries {
-			fmt.Fprintf(&sb, "- %s\n", l.Name)
-		}
-	}
-	if sb.Len() == 0 {
-		sb.WriteString("(no context provided; invent a fitting title)")
+	if seed := strings.TrimSpace(req.Text); seed != "" {
+		fmt.Fprintf(&sb, "\n%s", seed)
+	} else {
+		sb.WriteString("\nNo context provided — invent a fitting title.")
 	}
 
-	result, err := h.client.Complete(r.Context(), model, sys, sb.String(), 30)
+	result, err := h.client.Complete(r.Context(), model, sys, sb.String(), 30, "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

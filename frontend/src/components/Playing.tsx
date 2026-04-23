@@ -13,7 +13,7 @@ import RewindModal from './RewindModal'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
 import type { Chapter, GameState, GalleryImage, TTSSettings, Turn } from '../types'
-import { renderChapterContent } from '../types'
+import { renderChapterContent, detectThinkingModel } from '../types'
 import { useGallery } from '../hooks/useGallery'
 import { useToast } from '../hooks/useToast'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
@@ -30,11 +30,13 @@ interface Props {
     arc: string
     storyModel: string
     supportModel: string
+    reasoningEffort?: string
     modelRoles: Record<string, string>
     name: string
     sessionId: string
     gen: boolean
     streaming: string
+    streamingReasoning: string
     err: string
     lore: GameState['lore']
     chapters: Chapter[]
@@ -49,7 +51,7 @@ interface Props {
     lastNarrationText: string
     summing: boolean
     stUp: boolean
-    genStage: 'thinking' | 'writing' | 'stats' | 'summarizing' | null
+    genStage: 'sending' | 'thinking' | 'writing' | 'stats' | 'summarizing' | null
     saveStatus: 'idle' | 'saving' | 'saved'
   }
   dispatch: React.Dispatch<any>
@@ -283,6 +285,21 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   }, [activePanel])
 
   const streamingWords = state.streaming ? state.streaming.trim().split(/\s+/).length : 0
+  const reasoningWords = state.streamingReasoning ? state.streamingReasoning.trim().split(/\s+/).length : 0
+  const thinkingSupported = detectThinkingModel(state.storyModel)
+  const thinkingOn = !!state.reasoningEffort && state.reasoningEffort !== 'none'
+  const onToggleThinking = () => {
+    if (thinkingOn) {
+      setField('reasoningEffort', 'none')
+    } else {
+      const last = state.reasoningEffort && state.reasoningEffort !== 'none' ? state.reasoningEffort : 'low'
+      setField('reasoningEffort', last)
+    }
+  }
+  const [reasoningOpen, setReasoningOpen] = useState(false)
+  useEffect(() => {
+    if (state.genStage !== 'thinking') setReasoningOpen(false)
+  }, [state.genStage])
 
   // Per-turn edits/deletes on the currently-viewed chapter.
   const handleTurnEdit = (turnId: string, patch: Partial<Turn>) => {
@@ -404,6 +421,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onSwitch={openPanel}
         storyModel={state.storyModel}
         supportModel={state.supportModel}
+        reasoningEffort={state.reasoningEffort}
         modelRoles={state.modelRoles}
         effectiveCtxTokens={state.effectiveCtxTokens}
         setField={setField}
@@ -485,21 +503,30 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
       {/* Status bars */}
       {(state.gen || state.stUp || state.summing) && (
-        <div className="gb">
-          <span className="gd">&#x25cf;</span>
-          {state.genStage === 'thinking' && 'Thinking...'}
-          {state.genStage === 'writing' && <>Writing...{streamingWords > 0 && ` +${streamingWords} words`}</>}
-          {state.genStage === 'stats' && 'Updating stats...'}
-          {state.genStage === 'summarizing' && 'Summarizing...'}
-          {!state.genStage && (state.gen || state.stUp || state.summing) && 'Working...'}
-          <span style={{ marginLeft: 'auto', display: 'flex', gap: '.3rem' }}>
-            <button
-              className={`b bs sp${pinScroll ? ' ba' : ''}`}
-              onClick={() => setPinScroll(p => !p)}
-              title={pinScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
-            >{pinScroll ? '\u{1F4CC}' : '\u{1F4CC}'}</button>
-          </span>
-        </div>
+        <>
+          <div
+            className={`gb${state.streamingReasoning ? ' cl' : ''}`}
+            onClick={state.streamingReasoning ? () => setReasoningOpen(o => !o) : undefined}
+          >
+            <span className="gd">&#x25cf;</span>
+            {state.genStage === 'sending' && 'Sending...'}
+            {state.genStage === 'thinking' && <>Thinking...{reasoningWords > 0 && ` +${reasoningWords} words`}</>}
+            {state.genStage === 'writing' && <>Writing...{streamingWords > 0 && ` +${streamingWords} words`}</>}
+            {state.genStage === 'stats' && 'Updating stats...'}
+            {state.genStage === 'summarizing' && 'Summarizing...'}
+            {!state.genStage && (state.gen || state.stUp || state.summing) && 'Working...'}
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: '.3rem' }}>
+              <button
+                className={`b bs sp${pinScroll ? ' ba' : ''}`}
+                onClick={(e) => { e.stopPropagation(); setPinScroll(p => !p) }}
+                title={pinScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
+              >{pinScroll ? '\u{1F4CC}' : '\u{1F4CC}'}</button>
+            </span>
+          </div>
+          {reasoningOpen && state.streamingReasoning && (
+            <div className="rz">{state.streamingReasoning}</div>
+          )}
+        </>
       )}
       {activeContent.trim() && !state.gen && !state.stUp && !state.summing && (
         <div className="ib">
@@ -549,6 +576,9 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         canSpeak={!!lastAINarration}
         ttsBusy={tts.isPlaying || tts.isLoading}
         onStopTTS={tts.stop}
+        thinkingSupported={thinkingSupported}
+        thinkingOn={thinkingOn}
+        onToggleThinking={onToggleThinking}
       />
 
       {/* Toasts */}

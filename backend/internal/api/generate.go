@@ -52,6 +52,17 @@ func (h *Handlers) resolveModel(role string, state *game.GameState) string {
 	return h.resolveSupportModel(state)
 }
 
+// effortFor returns the reasoning_effort to send for a given task role.
+// Only the story role honors the user's setting; all support tasks (summary,
+// stats, transform, lore, image-prompt, naming) opt out so reasoning never
+// leaks into structured outputs.
+func (h *Handlers) effortFor(role string, state *game.GameState) string {
+	if role == "story" && state != nil {
+		return state.ReasoningEffort
+	}
+	return ""
+}
+
 // Generate handles story generation with SSE streaming.
 func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 	curID := h.validateSession(w, r)
@@ -107,10 +118,23 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	stops := []string{"# Ambient Outro"}
 
-	result, err := h.client.CompleteStream(ctx, model, game.SystemPrompt, prompt, maxTokens, stops, func(accumulated string) error {
-		cleaned := game.Clean(accumulated)
-		data, _ := json.Marshal(map[string]string{"text": cleaned})
-		fmt.Fprintf(w, "data: %s\n\n", data)
+	effort := h.effortFor("story", state)
+	var lastReasoningLen int
+	result, err := h.client.CompleteStream(ctx, model, game.SystemPrompt, prompt, maxTokens, effort, stops, func(content, reasoning string) error {
+		// Emit reasoning event if it grew. We forward raw — no Clean() since
+		// reasoning isn't user-facing narration.
+		if len(reasoning) > lastReasoningLen {
+			data, _ := json.Marshal(map[string]string{"reasoning": reasoning})
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			lastReasoningLen = len(reasoning)
+		}
+		// Emit content event whenever the content total has anything (callback
+		// fires only when *something* grew, so this captures the content side).
+		cleaned := game.Clean(content)
+		if cleaned != "" {
+			data, _ := json.Marshal(map[string]string{"text": cleaned})
+			fmt.Fprintf(w, "data: %s\n\n", data)
+		}
 		flusher.Flush()
 		return ctx.Err()
 	})
@@ -187,6 +211,7 @@ func (h *Handlers) Summarize(w http.ResponseWriter, r *http.Request) {
 		systemPrompt,
 		userPrompt,
 		1000,
+		"",
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -259,7 +284,7 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 		sb.String(), story,
 	)
 
-	raw, err := h.client.Complete(r.Context(), model, system, prompt, 1000)
+	raw, err := h.client.Complete(r.Context(), model, system, prompt, 1000, "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -362,7 +387,7 @@ func (h *Handlers) Transform(w http.ResponseWriter, r *http.Request) {
 	system := "You are a text editor for a narrative story. Return ONLY the corrected or transformed text. Do not add explanations, notes, or commentary. Preserve the original tone and style."
 	user := fmt.Sprintf("Instruction: %s\n\nText:\n%s", req.Instruction, req.Text)
 
-	result, err := h.client.Complete(r.Context(), model, system, user, 2000)
+	result, err := h.client.Complete(r.Context(), model, system, user, 2000, "")
 	if err != nil {
 		log.Printf("Transform error: %v", err)
 		http.Error(w, "Transform failed: "+err.Error(), http.StatusBadGateway)

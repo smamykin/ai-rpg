@@ -194,6 +194,9 @@ export async function enhanceImagePrompt(
   return res.prompt
 }
 
+export type LoreLength = 'concise' | 'descriptive' | 'full'
+export type LoreMode = 'extract' | 'enhance' | 'creative'
+
 export async function generateLore(
   name: string,
   tag: string,
@@ -203,11 +206,13 @@ export async function generateLore(
     summaries?: string
     overview?: string
     loreEntries?: { name: string; text: string }[]
-  }
+  },
+  length: LoreLength = 'descriptive',
+  mode: LoreMode = 'enhance',
 ): Promise<string> {
   const res = await fetchJSON<{ text: string }>('/lore/generate', {
     method: 'POST',
-    body: JSON.stringify({ name, tag, instructions, context }),
+    body: JSON.stringify({ name, tag, instructions, context, length, mode }),
   })
   return res.text
 }
@@ -272,6 +277,7 @@ export async function transform(text: string, instruction: string): Promise<stri
 
 export interface GenerateCallbacks {
   onChunk: (text: string) => void
+  onReasoning?: (text: string) => void
   onDone: (text: string) => void
   onError: (error: string) => void
 }
@@ -330,7 +336,9 @@ export function generate(
               callbacks.onDone(parsed.text || '')
               return
             }
-            if (parsed.text) {
+            if (parsed.reasoning) {
+              callbacks.onReasoning?.(parsed.reasoning)
+            } else if (parsed.text) {
               callbacks.onChunk(parsed.text)
             }
           } catch {

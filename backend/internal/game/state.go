@@ -22,9 +22,10 @@ type GameState struct {
 	Overview     string      `json:"overview"`
 	Style        string      `json:"style"`
 	CStyle       string      `json:"cStyle"`
-	StoryModel   string      `json:"storyModel"`
-	SupportModel string      `json:"supportModel"`
-	Arc          string      `json:"arc"`
+	StoryModel      string   `json:"storyModel"`
+	SupportModel    string   `json:"supportModel"`
+	ReasoningEffort string   `json:"reasoningEffort,omitempty"`
+	Arc             string   `json:"arc"`
 	Diff         string      `json:"diff"`
 	Lore         []LoreEntry `json:"lore"`
 	Secs         []Section   `json:"secs"`
@@ -71,7 +72,7 @@ type Turn struct {
 type Chapter struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
-	Turns        []Turn   `json:"turns,omitempty"`    // empty for acts
+	Turns        []Turn   `json:"turns"`              // empty for acts
 	Summary      string   `json:"summary"`            // empty while active
 	Status       string   `json:"status"`             // "active" | "closed" | "act"
 	Children     []string `json:"children,omitempty"` // chapter IDs — only on acts
@@ -196,6 +197,19 @@ func (s *GameState) Migrate() bool {
 		s.EffectiveCtxTokens = 32000
 		changed = true
 	}
+	// Ensure each chapter has a non-nil Turns slice (so JSON emits [] not null).
+	for i := range s.Chapters {
+		if s.Chapters[i].Turns == nil {
+			s.Chapters[i].Turns = []Turn{}
+			changed = true
+		}
+	}
+	for i := range s.ArchivedChapters {
+		if s.ArchivedChapters[i].Turns == nil {
+			s.ArchivedChapters[i].Turns = []Turn{}
+			changed = true
+		}
+	}
 	if s.ensureActiveChapter() {
 		changed = true
 	}
@@ -223,6 +237,7 @@ func (s *GameState) ensureActiveChapter() bool {
 	s.Chapters = append(s.Chapters, Chapter{
 		ID:        id,
 		Title:     "",
+		Turns:     []Turn{},
 		Status:    "active",
 		CreatedAt: time.Now().Unix(),
 	})
