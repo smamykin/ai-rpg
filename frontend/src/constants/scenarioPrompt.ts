@@ -18,7 +18,7 @@ Schema (all fields required unless marked optional):
       "id":      string - unique within the array, e.g. "l1", "l2", ...
       "name":    string - short label
       "text":    string - 1-3 short paragraphs of lore
-      "tag":     "world" | "character" | "rule" | "quest" | "item" | "creature" | "other"
+      "tag":     "world" | "location" | "faction" | "character" | "mechanic" | "quest" | "item" | "creature" | "other"
       "enabled": true
     }
   ],
@@ -27,7 +27,7 @@ Schema (all fields required unless marked optional):
 
 Rules for lore:
 - Include 4-8 entries by default, mixing tags.
-- "world" = locations, factions, history. "character" = specific named NPCs. "rule" = magic / physics / social rules that bind the story. "quest" = goals, hooks, or looming threats. "item" = artifacts, equipment, key objects. "creature" = monsters, beasts, non-named entities.
+- "world" = overarching setting, cosmology, history. "location" = specific places (cities, regions, landmarks, dungeons). "faction" = organizations, factions, groups, cults, governments. "character" = specific named NPCs. "mechanic" = magic / physics / social rules that bind the story. "quest" = goals, hooks, or looming threats. "item" = artifacts, equipment, key objects. "creature" = monsters, beasts, non-named entities.
 - Keep each entry concrete and evocative, not encyclopedic.
 
 Do NOT include "id", "createdAt", or "updatedAt" at the top level of the scenario — the app fills those in on import. Leave "secs" as an empty array unless I explicitly ask for tracking sections.

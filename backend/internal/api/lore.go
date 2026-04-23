@@ -69,8 +69,10 @@ Rules:
 
 	focusByTag := map[string]string{
 		"character": "Role or occupation, appearance, demeanor, relationships, goals, secrets.",
-		"world":     "Location or extent, history, culture, notable features, role in the story.",
-		"rule":      "When and where it applies, exact constraints, exceptions, consequences of breaking it.",
+		"world":     "Scope, history, culture, cosmology, notable features, role in the story.",
+		"location":  "Geography, atmosphere, inhabitants, landmarks, strategic or narrative significance.",
+		"faction":   "Composition, goals, methods, allies, rivals, current power and reach.",
+		"mechanic":  "When and where it applies, exact constraints, exceptions, consequences of breaking it.",
 		"quest":     "Giver, objective, reward, complications, current state.",
 		"item":      "Origin, appearance, powers or properties, current owner or location, history.",
 		"creature":  "Habitat, appearance, behavior, abilities, threat level, lore or origin.",
@@ -148,7 +150,7 @@ Rules:
 type SuggestNameRequest struct {
 	Kind    string         `json:"kind"`    // "lore", "session", "scenario"
 	Text    string         `json:"text"`    // the primary seed (lore body, adventure overview, etc.)
-	Tag     string         `json:"tag"`     // optional (for lore: world/character/rule/...)
+	Tag     string         `json:"tag"`     // optional (for lore: world/location/faction/character/mechanic/...)
 	Context SuggestNameCtx `json:"context"` // optional background
 }
 

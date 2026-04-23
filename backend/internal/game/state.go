@@ -125,8 +125,28 @@ type LoreEntry struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Text    string `json:"text"`
-	Tag     string `json:"tag"` // "world", "character", "rule", "quest", "item", "creature", "other"
+	Tag     string `json:"tag"` // "world", "location", "faction", "character", "mechanic", "quest", "item", "creature", "other"
 	Enabled bool   `json:"enabled"`
+}
+
+// NormalizeLoreTag renames legacy tags to the current set.
+func NormalizeLoreTag(tag string) string {
+	if tag == "rule" {
+		return "mechanic"
+	}
+	return tag
+}
+
+// NormalizeLoreTags rewrites legacy tags in place. Returns true if any entry changed.
+func NormalizeLoreTags(lore []LoreEntry) bool {
+	changed := false
+	for i := range lore {
+		if n := NormalizeLoreTag(lore[i].Tag); n != lore[i].Tag {
+			lore[i].Tag = n
+			changed = true
+		}
+	}
+	return changed
 }
 
 type Section struct {
@@ -179,6 +199,9 @@ func (s *GameState) Migrate() bool {
 	}
 	if s.Lore == nil {
 		s.Lore = []LoreEntry{}
+		changed = true
+	}
+	if NormalizeLoreTags(s.Lore) {
 		changed = true
 	}
 	if s.Secs == nil {

@@ -24,7 +24,12 @@ export interface LoreEntry {
   enabled: boolean
 }
 
-export const LORE_TAGS = ['world', 'character', 'rule', 'quest', 'item', 'creature', 'other'] as const
+export const LORE_TAGS = ['world', 'location', 'faction', 'character', 'mechanic', 'quest', 'item', 'creature', 'other'] as const
+
+export function normalizeLoreTag(tag: string): string {
+  if (tag === 'rule') return 'mechanic'
+  return tag
+}
 
 export interface Section {
   id: string
@@ -135,7 +140,7 @@ export function validateScenario(obj: unknown): Scenario | null {
         id: asString(l.id) || uid('l'),
         name: asString(l.name),
         text: asString(l.text),
-        tag: asString(l.tag) || 'other',
+        tag: normalizeLoreTag(asString(l.tag)) || 'other',
         enabled: l.enabled !== false,
       }
     })

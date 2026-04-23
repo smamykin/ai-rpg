@@ -83,6 +83,9 @@ func (s *ScenarioStore) Get(id string) (*game.Scenario, error) {
 	if sc.Secs == nil {
 		sc.Secs = []game.Section{}
 	}
+	if game.NormalizeLoreTags(sc.Lore) {
+		_ = s.write(&sc)
+	}
 	return &sc, nil
 }
 

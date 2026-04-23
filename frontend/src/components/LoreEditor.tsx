@@ -9,8 +9,10 @@ import ModalTextField from './ModalTextField'
 
 const TAG_COLORS: Record<string, string> = {
   world: 'var(--ac)',
+  location: 'var(--loc)',
+  faction: 'var(--fac)',
   character: 'var(--ac2)',
-  rule: 'var(--mt)',
+  mechanic: 'var(--mt)',
   quest: 'var(--dng)',
   item: 'var(--itm)',
   creature: 'var(--crt)',
