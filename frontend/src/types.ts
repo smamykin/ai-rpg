@@ -38,6 +38,13 @@ export interface Section {
   content: string
 }
 
+export interface Note {
+  id: string
+  body: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface TTSModelSettings {
   voice?: string
   speed?: number
@@ -69,6 +76,7 @@ export interface GameState {
   diff: string
   lore: LoreEntry[]
   secs: Section[]
+  notes: Note[]
   auFreq: number
   tts: TTSSettings
 
@@ -294,6 +302,7 @@ export function defaultState(): GameState {
     diff: 'normal',
     lore: [],
     secs: [],
+    notes: [],
     auFreq: 0,
     tts: { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
     chapters: [{

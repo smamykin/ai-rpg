@@ -30,6 +30,7 @@ type GameState struct {
 	Diff         string      `json:"diff"`
 	Lore         []LoreEntry `json:"lore"`
 	Secs         []Section   `json:"secs"`
+	Notes        []Note      `json:"notes"`
 	AuFreq       int         `json:"auFreq"`
 	TTS          TTSSettings `json:"tts"`
 
@@ -157,6 +158,14 @@ type Section struct {
 	Content     string `json:"content"`
 }
 
+// Note is a player-authored OOC scratch note. Not sent to the AI; travels with the session.
+type Note struct {
+	ID        string `json:"id"`
+	Body      string `json:"body"`
+	CreatedAt int64  `json:"createdAt,omitempty"`
+	UpdatedAt int64  `json:"updatedAt,omitempty"`
+}
+
 // Scenario is a reusable session template (overview + style + lore + sections).
 type Scenario struct {
 	ID          string      `json:"id"`
@@ -207,6 +216,10 @@ func (s *GameState) Migrate() bool {
 	}
 	if s.Secs == nil {
 		s.Secs = []Section{}
+		changed = true
+	}
+	if s.Notes == nil {
+		s.Notes = []Note{}
 		changed = true
 	}
 	if s.ModelRoles == nil {
@@ -299,6 +312,7 @@ func DefaultState() *GameState {
 		Diff:               "normal",
 		Lore:               []LoreEntry{},
 		Secs:               []Section{},
+		Notes:              []Note{},
 		Chapters:           []Chapter{},
 		EffectiveCtxTokens: 32000,
 		Format:             FormatV6,

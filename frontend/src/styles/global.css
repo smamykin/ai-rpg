@@ -659,6 +659,9 @@ select {
 .mtf-i { color: var(--mt); font-size: .9rem; line-height: 1.45; flex-shrink: 0; }
 .mtf:hover .mtf-i { color: var(--ac); }
 
+/* Notes list — stacked mtf rows */
+.nt-list { display: flex; flex-direction: column; gap: .4rem; }
+
 /* Editor modal (scalable textarea editor) */
 .emd {
   position: fixed;

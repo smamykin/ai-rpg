@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
-import type { Chapter, GameState, LoreEntry, Section, Phase, TTSModelSettings, Turn } from '../types'
+import type { Chapter, GameState, LoreEntry, Note, Section, Phase, TTSModelSettings, Turn } from '../types'
 import { defaultState, getActiveChapter, getViewingChapter, newChapterId, newTurnId, renderChapterContent, wordCount } from '../types'
 import { expandShortcut } from '../utils/shortcuts'
 import * as api from '../api'
@@ -44,6 +44,9 @@ type Action =
   | { type: 'UPDATE_SEC'; id: string; content: string }
   | { type: 'REMOVE_SEC'; id: string }
   | { type: 'SET_SECS'; secs: Section[] }
+  | { type: 'ADD_NOTE'; note: Note }
+  | { type: 'UPDATE_NOTE'; id: string; body: string }
+  | { type: 'DELETE_NOTE'; id: string }
   | { type: 'LOAD_STATE'; state: GameState }
   | { type: 'ENTER_HUB' }
   | { type: 'RESET' }
@@ -114,6 +117,18 @@ function reducer(state: State, action: Action): State {
     case 'SET_SECS':
       return { ...state, secs: action.secs }
 
+    case 'ADD_NOTE':
+      return { ...state, notes: [...(state.notes || []), action.note] }
+    case 'UPDATE_NOTE':
+      return {
+        ...state,
+        notes: (state.notes || []).map(n =>
+          n.id === action.id ? { ...n, body: action.body, updatedAt: Math.floor(Date.now() / 1000) } : n,
+        ),
+      }
+    case 'DELETE_NOTE':
+      return { ...state, notes: (state.notes || []).filter(n => n.id !== action.id) }
+
     case 'LOAD_STATE': {
       const loaded = action.state
       // Backend omits empty turns arrays; normalize so callers can iterate freely.
@@ -126,6 +141,7 @@ function reducer(state: State, action: Action): State {
         ...loaded,
         chapters,
         archivedChapters,
+        notes: loaded.notes || [],
         tts: loaded.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
         phase: hasPlayContent ? 'playing' : 'setup',
         loaded: true,
@@ -218,13 +234,13 @@ function toRoman(n: number): string {
 function toPersistable(s: State): Partial<GameState> {
   const {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
-    lore, secs, auFreq, tts,
+    lore, secs, notes, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
     effectiveCtxTokens, format,
   } = s
   return {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
-    lore, secs, auFreq, tts,
+    lore, secs, notes, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
     effectiveCtxTokens, format,
   }
@@ -294,7 +310,7 @@ export function useGameState() {
     return () => clearTimeout(saveTimer.current)
   }, [
     state.name, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel,
-    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.auFreq, state.tts,
+    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.notes, state.auFreq, state.tts,
     state.chapters, state.activeChapterId, state.viewingChapterId, state.archivedChapters,
     state.effectiveCtxTokens, state.loaded, state.phase, state.sessionId,
   ])

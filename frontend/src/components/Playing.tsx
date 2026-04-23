@@ -47,6 +47,7 @@ interface Props {
     archivedChapters: Chapter[]
     effectiveCtxTokens: number
     secs: GameState['secs']
+    notes: GameState['notes']
     auFreq: number
     tts: TTSSettings
     lastNarrationId: number
@@ -419,6 +420,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
       <StoryPanel
         show={activePanel === 'story'} onClose={() => setActivePanel(null)}
         lore={state.lore}
+        notes={state.notes || []}
         dispatch={dispatch}
         galleryImages={gallery.images}
         onGenerateImage={(loreId) => openGenModal('lore', loreId)}

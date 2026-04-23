@@ -1,17 +1,19 @@
 import { useState } from 'react'
-import type { LoreEntry, GalleryImage, GameState } from '../../types'
+import type { LoreEntry, Note, GalleryImage, GameState } from '../../types'
 import { STYLES } from '../../types'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
 import LoreEditor from '../LoreEditor'
+import NotesEditor from '../NotesEditor'
 import ModalTextField from '../ModalTextField'
 
-type SubTab = 'main' | 'lore'
+type SubTab = 'main' | 'lore' | 'notes'
 
 interface Props {
   show: boolean
   onClose: () => void
   lore: LoreEntry[]
+  notes: Note[]
   dispatch: React.Dispatch<any>
   galleryImages?: GalleryImage[]
   onGenerateImage?: (loreId: string) => void
@@ -27,7 +29,7 @@ interface Props {
 }
 
 export default function StoryPanel({
-  show, onClose, lore, dispatch,
+  show, onClose, lore, notes, dispatch,
   galleryImages = [], onGenerateImage,
   story = '', overview, summariesText = '',
   onSwitch,
@@ -35,13 +37,16 @@ export default function StoryPanel({
 }: Props) {
   const [sub, setSub] = useState<SubTab>('main')
   const enabledCount = lore.filter(l => l.enabled).length
+  const headerSuffix =
+    sub === 'lore' ? ` \u2014 Lore (${enabledCount}/${lore.length})` :
+    sub === 'notes' ? ` \u2014 Notes (${notes.length})` : ''
 
   return (
     <>
       <div className={`ov ${show ? 'o' : ''}`} onClick={onClose} />
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
-          <span>Story{sub === 'lore' ? ` \u2014 Lore (${enabledCount}/${lore.length})` : ''}</span>
+          <span>Story{headerSuffix}</span>
           <button className="b bs" onClick={onClose}>&#x2715;</button>
         </div>
         {onSwitch && <PanelTabs active="story" onSwitch={onSwitch} />}
@@ -49,6 +54,7 @@ export default function StoryPanel({
         <div className="pt">
           <button className={`pt-t${sub === 'main' ? ' pt-a' : ''}`} onClick={() => setSub('main')}>Main</button>
           <button className={`pt-t${sub === 'lore' ? ' pt-a' : ''}`} onClick={() => setSub('lore')}>Lore</button>
+          <button className={`pt-t${sub === 'notes' ? ' pt-a' : ''}`} onClick={() => setSub('notes')}>Notes</button>
         </div>
 
         {sub === 'main' ? (
@@ -85,13 +91,20 @@ export default function StoryPanel({
               </select>
             </div>
           </>
-        ) : (
+        ) : sub === 'lore' ? (
           <LoreEditor
             lore={lore}
             onChange={next => dispatch({ type: 'SET_LORE', lore: next })}
             galleryImages={galleryImages}
             onGenerateImage={onGenerateImage}
             aiContext={{ story, overview, summaries: summariesText }}
+          />
+        ) : (
+          <NotesEditor
+            notes={notes}
+            onAdd={note => dispatch({ type: 'ADD_NOTE', note })}
+            onUpdate={(id, body) => dispatch({ type: 'UPDATE_NOTE', id, body })}
+            onDelete={id => dispatch({ type: 'DELETE_NOTE', id })}
           />
         )}
       </div>
