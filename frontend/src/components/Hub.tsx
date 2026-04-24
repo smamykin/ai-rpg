@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Check, X } from 'lucide-react'
 import type { GameState, SessionMeta } from '../types'
 import ScenarioPicker from './ScenarioPicker'
 import SuggestNameButton from './SuggestNameButton'
@@ -110,8 +111,8 @@ export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRen
                         disabled={!s.overviewHead}
                         onSuggest={n => setEditName(n)}
                       />
-                      <button className="sgn" onClick={commitEdit} title="Save name">&#x2713; Save</button>
-                      <button className="sgn" onClick={() => setEditingId(null)} title="Cancel">&#x2715;</button>
+                      <button className="sgn" onClick={commitEdit} title="Save name" aria-label="Save name"><Check size={14} className="ic ic-success" /> Save</button>
+                      <button className="sgn" onClick={() => setEditingId(null)} title="Cancel" aria-label="Cancel edit"><X size={14} className="ic" /></button>
                     </div>
                   ) : (
                     <div className="hub-name">{s.name || 'Adventure'}</div>

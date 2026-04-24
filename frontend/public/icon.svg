@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0c0a09"/>
+  <defs>
+    <g id="sword">
+      <path d="M 256 78 L 276 320 L 236 320 Z" fill="#c8cdd4"/>
+      <path d="M 256 86 L 262 312 L 250 312 Z" fill="#e8ecf0"/>
+      <rect x="208" y="320" width="96" height="18" fill="#a37e2c"/>
+      <rect x="204" y="320" width="104" height="4" fill="#d4a843"/>
+      <rect x="248" y="338" width="16" height="58" fill="#4a2f18"/>
+      <rect x="246" y="338" width="4" height="58" fill="#6b4422"/>
+      <circle cx="256" cy="408" r="13" fill="#d4a843"/>
+      <circle cx="253" cy="405" r="4" fill="#f0c968"/>
+    </g>
+  </defs>
+  <use href="#sword" transform="rotate(45 256 256)"/>
+  <use href="#sword" transform="rotate(-45 256 256)"/>
+</svg>

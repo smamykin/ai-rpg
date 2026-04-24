@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Expand } from 'lucide-react'
 import type { Note } from '../types'
 import { uid } from '../types'
 import EditorModal from './EditorModal'
@@ -10,9 +11,22 @@ interface Props {
   onDelete: (id: string) => void
 }
 
+function stripMarkdown(s: string): string {
+  return s
+    .replace(/^\s*(#{1,6}|[-*+>]|\d+\.)\s+/, '')
+    .replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .trim()
+}
+
 function firstLine(body: string): string {
   const line = body.split('\n').find(l => l.trim())
-  return line ? line.trim() : ''
+  return line ? stripMarkdown(line.trim()) : ''
 }
 
 export default function NotesEditor({ notes, onAdd, onUpdate, onDelete }: Props) {
@@ -49,7 +63,7 @@ export default function NotesEditor({ notes, onAdd, onUpdate, onDelete }: Props)
                 title="Click to edit"
               >
                 <span className="mtf-v">{empty ? 'Empty note — click to edit…' : preview}</span>
-                <span className="mtf-i" aria-hidden>&#x2922;</span>
+                <span className="mtf-i" aria-hidden><Expand size={12} className="ic" /></span>
               </button>
             )
           })}

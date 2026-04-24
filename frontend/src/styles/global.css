@@ -18,6 +18,14 @@
   --editor-size: 1rem;
 }
 
+.ic { display: inline-block; vertical-align: -.15em; flex-shrink: 0; }
+.ic-danger { color: var(--dng); }
+.ic-accent { color: var(--ac); }
+.ic-pin { color: var(--ac); }
+.ic-success { color: var(--crt); }
+.ic-muted { color: var(--mt); }
+.b:hover .ic-danger-hover { color: var(--dng); }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body {

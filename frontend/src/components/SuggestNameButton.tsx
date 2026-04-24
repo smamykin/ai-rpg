@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { RotateCw, AlertTriangle, Sparkles } from 'lucide-react'
 import * as api from '../api'
 import type { SuggestNameCtx } from '../api'
 
@@ -36,7 +37,7 @@ export default function SuggestNameButton({ kind, text, tag, context, disabled, 
       title={err || 'Suggest a name'}
       style={err ? { borderColor: 'var(--dng)', color: 'var(--dng)' } : undefined}
     >
-      {busy ? <span className="sgn-sp">&#x21bb;</span> : err ? '\u26A0' : '\u2728'} {label ?? 'Suggest'}
+      {busy ? <span className="sgn-sp"><RotateCw size={12} className="ic" /></span> : err ? <AlertTriangle size={12} className="ic ic-danger" /> : <Sparkles size={12} className="ic ic-accent" />} {label ?? 'Suggest'}
     </button>
   )
 }

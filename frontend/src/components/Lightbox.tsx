@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react'
+import { X, Pin, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { GalleryImage } from '../types'
 
 interface Props {
@@ -46,19 +47,21 @@ export default function Lightbox({ images, index, onClose, onNavigate, onDelete,
 
   return (
     <div className="lbx" onClick={onClose}>
-      <button className="b bs lbx-cl" onClick={onClose}>&times;</button>
+      <button className="b bs lbx-cl" onClick={onClose} aria-label="Close"><X size={18} className="ic" /></button>
 
       {hasPrev && (
         <button
           className="lbx-nav lbx-prev"
           onClick={e => { e.stopPropagation(); onNavigate(index - 1) }}
-        >&lsaquo;</button>
+          aria-label="Previous image"
+        ><ChevronLeft size={28} className="ic" /></button>
       )}
       {hasNext && (
         <button
           className="lbx-nav lbx-next"
           onClick={e => { e.stopPropagation(); onNavigate(index + 1) }}
-        >&rsaquo;</button>
+          aria-label="Next image"
+        ><ChevronRight size={28} className="ic" /></button>
       )}
 
       <img
@@ -74,9 +77,9 @@ export default function Lightbox({ images, index, onClose, onNavigate, onDelete,
         <button className="b bs" onClick={download}>Download</button>
         {onSetBg && (
           pinnedBgId === img.id ? (
-            <button className="b bs ba" onClick={() => onSetBg(null)}>&#x2605; Pinned</button>
+            <button className="b bs ba" onClick={() => onSetBg(null)}><Pin size={14} className="ic" fill="currentColor" /> Pinned</button>
           ) : (
-            <button className="b bs" onClick={() => onSetBg(img.id)}>&#x2606; Pin as BG</button>
+            <button className="b bs" onClick={() => onSetBg(img.id)}><Pin size={14} className="ic ic-pin" /> Pin as BG</button>
           )
         )}
         {onDelete && (

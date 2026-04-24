@@ -15,6 +15,7 @@ import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
 import type { Chapter, GameState, GalleryImage, TTSSettings, Turn } from '../types'
 import { renderChapterContent, detectThinkingModel } from '../types'
+import { Menu, Check, RotateCcw } from 'lucide-react'
 import { useGallery } from '../hooks/useGallery'
 import { useToast } from '../hooks/useToast'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
@@ -367,12 +368,12 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           onClick={() => { setShowOutline(true); setActivePanel(null) }}
           title="Outline & menu"
           aria-label="Outline menu"
-        >&#x2630;</button>
+        ><Menu size={16} className="ic" /></button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', overflow: 'hidden', flex: 1, minWidth: 0 }}>
           <h1>{state.overview?.slice(0, 24) || 'AI RPG'}{state.overview && state.overview.length > 24 ? '\u2026' : ''}</h1>
           {state.saveStatus !== 'idle' && (
             <span className="sv">
-              {state.saveStatus === 'saving' ? 'Saving...' : '\u2713 Saved'}
+              {state.saveStatus === 'saving' ? 'Saving...' : <><Check size={12} className="ic ic-success" /> Saved</>}
             </span>
           )}
         </div>
@@ -382,7 +383,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           title="Session (Lore, Gallery, Track, Settings, AI)"
           aria-label="Session menu"
         >
-          &#x2630;
+          <Menu size={16} className="ic" />
           {(loreCount > 0 || state.secs.length > 0 || gallery.count > 0) && (
             <span style={{ fontSize: '.65rem', marginLeft: '.25rem', color: 'var(--mt)' }}>
               {[loreCount && `L${loreCount}`, gallery.count && `G${gallery.count}`, state.secs.length && `T${state.secs.length}`].filter(Boolean).join(' ')}
@@ -525,7 +526,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           <span style={{ display: 'flex', gap: '.3rem' }}>
             {viewing.status === 'closed' && !state.chapters.some(c => c.status === 'act' && c.children?.includes(viewing.id)) && (
               <button className="b bs" onClick={() => setShowRewind(true)} title="Make this the active chapter; archive or delete later chapters">
-                &#x21ba; Rewind
+                <RotateCcw size={14} className="ic" /> Rewind
               </button>
             )}
             <button className="b bs" onClick={actions.returnToActive}>Return</button>

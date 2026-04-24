@@ -1,4 +1,5 @@
 import { forwardRef, useState, type TextareaHTMLAttributes } from 'react'
+import { Expand } from 'lucide-react'
 import EditorModal from './EditorModal'
 
 interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> {
@@ -28,7 +29,7 @@ const ExpandableTextarea = forwardRef<HTMLTextAreaElement, Props>(function Expan
         aria-label="Expand editor"
         title="Expand editor"
       >
-        &#x2922;
+        <Expand size={12} className="ic" />
       </button>
       {open && (
         <EditorModal

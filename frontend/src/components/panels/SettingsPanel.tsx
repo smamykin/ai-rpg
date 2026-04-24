@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { X, Square, RefreshCw, Hourglass, Download } from 'lucide-react'
 import type { GameState, ModelInfo, ModelRole, TTSSettings } from '../../types'
 import { MODEL_ROLES } from '../../types'
 import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, AMBIENT_BLUR_MIN, AMBIENT_BLUR_MAX } from '../../display'
@@ -8,6 +9,7 @@ import type { PanelId } from '../PanelTabs'
 import ModelPicker from '../ModelPicker'
 import ModalTextField from '../ModalTextField'
 import { TTS_MODELS, TTS_VOICES, getModelMeta, getModelSettings } from '../../constants/tts'
+import { useInstallPrompt } from '../../hooks/useInstallPrompt'
 import * as apiClient from '../../api'
 
 const ROLE_LABELS: Record<ModelRole, { name: string; hint: string }> = {
@@ -54,6 +56,7 @@ export default function SettingsPanel({
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelsErr, setModelsErr] = useState('')
   const [ctxDraft, setCtxDraft] = useState<string | null>(null)
+  const install = useInstallPrompt()
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true)
@@ -91,9 +94,18 @@ export default function SettingsPanel({
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Settings</span>
-          <button className="b bs" onClick={onClose}>&#x2715;</button>
+          <button className="b bs" onClick={onClose} aria-label="Close settings"><X size={16} className="ic" /></button>
         </div>
         {onSwitch && <PanelTabs active="settings" onSwitch={onSwitch} visibleTabs={visibleTabs} />}
+
+        {install.canInstall && (
+          <div className="gr">
+            <button className="b" onClick={install.install}>
+              <Download size={14} className="ic" /> Install app
+            </button>
+            <div className="hint">Adds AI RPG to your home screen and launches in standalone mode.</div>
+          </div>
+        )}
 
         <div style={{ margin: '0 0 .6rem' }}>
           <label className="lb" style={{ marginBottom: '.5rem' }}>AI Model</label>
@@ -103,7 +115,7 @@ export default function SettingsPanel({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.3rem' }}>
             <label className="lb" style={{ marginBottom: 0 }}>Models</label>
             <button className="b bs" onClick={loadModels} disabled={modelsLoading}>
-              {modelsLoading ? '\u23f3' : '\ud83d\udd04'} {models.length ? `Refresh (${models.length})` : 'Load'}
+              {modelsLoading ? <Hourglass size={12} className="ic" /> : <RefreshCw size={12} className="ic" />} {models.length ? `Refresh (${models.length})` : 'Load'}
             </button>
           </div>
           {modelsErr && <div className="er" style={{ margin: '.3rem 0' }}>{modelsErr}</div>}
@@ -237,7 +249,7 @@ export default function SettingsPanel({
             <span>Auto-play new narration</span>
           </label>
           {ttsPlaying && (
-            <button className="b bs" onClick={onStopTTS} style={{ color: 'var(--dng)', marginTop: '.4rem' }}>&#x23f9; Stop playback</button>
+            <button className="b bs" onClick={onStopTTS} style={{ marginTop: '.4rem' }}><Square size={14} className="ic ic-danger" fill="currentColor" /> Stop playback</button>
           )}
         </div>
 

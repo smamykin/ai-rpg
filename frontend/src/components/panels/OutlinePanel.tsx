@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { X, ChevronDown, ChevronRight } from 'lucide-react'
 import type { Chapter } from '../../types'
 import { wordCount, renderChapterContent } from '../../types'
 import * as api from '../../api'
@@ -112,7 +113,8 @@ export default function OutlinePanel({
                 onClick={(e) => { e.stopPropagation(); setExpandedActs(s => ({ ...s, [c.id]: !s[c.id] })) }}
                 style={{ padding: '0 .2rem', fontSize: '.7rem', background: 'transparent', border: 'none', color: 'var(--mt)' }}
                 title={expanded ? 'Collapse' : 'Expand'}
-              >{expanded ? '\u25bc' : '\u25b6'}</button>
+                aria-label={expanded ? 'Collapse act' : 'Expand act'}
+              >{expanded ? <ChevronDown size={12} className="ic" /> : <ChevronRight size={12} className="ic" />}</button>
             )}
             {renamingId === c.id ? (
               <input
@@ -172,7 +174,7 @@ export default function OutlinePanel({
       <div className={`pnl ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Outline</span>
-          <button className="b bs" onClick={onClose}>&#x2715;</button>
+          <button className="b bs" onClick={onClose} aria-label="Close outline"><X size={16} className="ic" /></button>
         </div>
 
         <div style={{ marginBottom: '.75rem' }}>
@@ -278,7 +280,7 @@ export default function OutlinePanel({
               onClick={() => setShowArchived(s => !s)}
               style={{ width: '100%', justifyContent: 'space-between', fontSize: '.78rem' }}
             >
-              <span>{showArchived ? '\u25bc' : '\u25b6'} Archived ({archivedChapters.length})</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem' }}>{showArchived ? <ChevronDown size={12} className="ic" /> : <ChevronRight size={12} className="ic" />} Archived ({archivedChapters.length})</span>
             </button>
             {showArchived && (
               <div style={{ marginTop: '.4rem' }}>

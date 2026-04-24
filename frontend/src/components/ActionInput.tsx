@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, Brain } from 'lucide-react'
 
 interface Props {
   gen: boolean
@@ -68,7 +69,8 @@ export default function ActionInput({
             disabled={!arc}
             title="Clear"
             style={{ padding: '.35rem .55rem' }}
-          >&#x2715;</button>
+            aria-label="Clear arc"
+          ><X size={16} className="ic" /></button>
         </div>
       )}
       <div className="ia">
@@ -84,31 +86,33 @@ export default function ActionInput({
             onInput={handleInput}
           />
           {gen ? (
-            <button className="b bs" onClick={onStop} style={{ color: 'var(--dng)', minHeight: 40 }}>&#x23f9;</button>
+            <button className="b bs" onClick={onStop} style={{ minHeight: 40 }} aria-label="Stop generation"><Square size={18} className="ic ic-danger" fill="currentColor" /></button>
           ) : action.trim() ? (
-            <button className="b ba" onClick={handleSubmit} disabled={blocked} style={{ minHeight: 40 }}>&#x25b6;</button>
+            <button className="b ba" onClick={handleSubmit} disabled={blocked} style={{ minHeight: 40 }} aria-label="Submit action"><Play size={18} className="ic" fill="currentColor" /></button>
           ) : !story.trim() ? (
             <button className="b ba" onClick={onContinue} disabled={blocked} style={{ minHeight: 40, padding: '0 .9rem' }}>Begin</button>
           ) : (
-            <button className="b" onClick={onContinue} disabled={blocked} style={{ minHeight: 40 }}>&#x23ed;</button>
+            <button className="b" onClick={onContinue} disabled={blocked} style={{ minHeight: 40 }} aria-label="Continue"><SkipForward size={18} className="ic" fill="currentColor" /></button>
           )}
         </div>
         <div className="ct">
-          <button className="b bs" onClick={onRegen} disabled={blocked || !story.trim()}>&#x1f501;</button>
-          <button className="b bs" onClick={onDelete} disabled={blocked || !story.trim()}>&#x1f5d1;</button>
+          <button className="b bs" onClick={onRegen} disabled={blocked || !story.trim()} title="Regenerate" aria-label="Regenerate"><RefreshCw size={16} className="ic" /></button>
+          <button className="b bs" onClick={onDelete} disabled={blocked || !story.trim()} title="Delete last" aria-label="Delete last turn"><Trash2 size={16} className="ic ic-danger-hover" /></button>
           {ttsBusy ? (
-            <button className="b bs" onClick={onStopTTS} title="Stop TTS" style={{ color: 'var(--dng)' }}>&#x23f9;</button>
+            <button className="b bs" onClick={onStopTTS} title="Stop TTS" aria-label="Stop TTS"><Square size={16} className="ic ic-danger" fill="currentColor" /></button>
           ) : (
-            <button className="b bs" onClick={onSpeak} disabled={!canSpeak} title="Read last narration">&#x1f50a;</button>
+            <button className="b bs" onClick={onSpeak} disabled={!canSpeak} title="Read last narration" aria-label="Read last narration"><Volume2 size={16} className="ic" /></button>
           )}
-          <button className={`b bs${showArc ? ' ba' : ''}`} onClick={onToggleArc}>&#x1f3af;</button>
+          <button className={`b bs${showArc ? ' ba' : ''}`} onClick={onToggleArc} title="Arc guidance" aria-label="Toggle arc guidance" aria-pressed={showArc}><Target size={16} className="ic" /></button>
           {thinkingSupported && (
             <button
               className={`b bs${thinkingOn ? ' ba' : ''}`}
               onClick={onToggleThinking}
               disabled={blocked}
               title={thinkingOn ? 'Thinking on (click to disable)' : 'Thinking off (click to enable)'}
-            >&#x1f9e0;</button>
+              aria-label="Toggle thinking"
+              aria-pressed={thinkingOn}
+            ><Brain size={16} className="ic" /></button>
           )}
           <div style={{ flex: 1 }} />
           {secsLength === 0 && story.length > 100 && (

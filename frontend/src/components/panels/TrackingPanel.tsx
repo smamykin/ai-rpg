@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X, Hourglass } from 'lucide-react'
 import type { Section, GameState } from '../../types'
 import { uid } from '../../types'
 import PanelTabs from '../PanelTabs'
@@ -29,7 +30,7 @@ export default function TrackingPanel({
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Tracking</span>
-          <button className="b bs" onClick={onClose}>&#x2715;</button>
+          <button className="b bs" onClick={onClose} aria-label="Close tracking"><X size={16} className="ic" /></button>
         </div>
         {onSwitch && <PanelTabs active="track" onSwitch={onSwitch} />}
 
@@ -52,7 +53,7 @@ export default function TrackingPanel({
           <div key={s.id} className="sc">
             <div className="sh">
               <span className="sn">{s.name}</span>
-              <button className="b bs" onClick={() => dispatch({ type: 'REMOVE_SEC', id: s.id })} style={{ padding: '.15rem .4rem', fontSize: '.68rem' }}>&#x2715;</button>
+              <button className="b bs" onClick={() => dispatch({ type: 'REMOVE_SEC', id: s.id })} style={{ padding: '.15rem .4rem', fontSize: '.68rem' }} aria-label="Remove section"><X size={12} className="ic" /></button>
             </div>
             {s.description && <div className="sd">{s.description}</div>}
             <textarea
@@ -74,7 +75,7 @@ export default function TrackingPanel({
             </div>
             <div style={{ fontSize: '.7rem', color: 'var(--mt)', marginBottom: '.5rem' }}>0 = manual only.</div>
             <button className="b ba" onClick={onUpdateStats} disabled={stUp} style={{ width: '100%', justifyContent: 'center' }}>
-              {stUp ? '\u23f3...' : 'Update All'}
+              {stUp ? <><Hourglass size={12} className="ic" />...</> : 'Update All'}
             </button>
           </div>
         )}

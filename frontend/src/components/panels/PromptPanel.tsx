@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { X, ChevronDown, ChevronRight } from 'lucide-react'
 import type { PromptPreview, Task } from '../../types'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
@@ -76,7 +77,7 @@ export default function PromptPanel({ show, onClose, onSwitch, sessionId, hasAct
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Prompt preview</span>
-          <button className="b bs" onClick={onClose}>&#x2715;</button>
+          <button className="b bs" onClick={onClose} aria-label="Close panel"><X size={16} className="ic" /></button>
         </div>
         {onSwitch && <PanelTabs active="prompt" onSwitch={onSwitch} />}
 
@@ -180,7 +181,7 @@ export default function PromptPanel({ show, onClose, onSwitch, sessionId, hasAct
                 onClick={() => setShowSystem(s => !s)}
                 style={{ width: '100%', justifyContent: 'space-between' }}
               >
-                <span>{showSystem ? '\u25bc' : '\u25b6'} System prompt</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem' }}>{showSystem ? <ChevronDown size={14} className="ic" /> : <ChevronRight size={14} className="ic" />} System prompt</span>
                 <span style={{ color: 'var(--mt)' }}>{preview.system.tokens} tok</span>
               </button>
               {showSystem && <pre className="pvt">{preview.system.text}</pre>}

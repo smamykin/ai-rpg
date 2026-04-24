@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import type { LoreEntry, Note, GalleryImage, GameState } from '../../types'
 import { STYLES } from '../../types'
 import PanelTabs from '../PanelTabs'
@@ -47,7 +48,7 @@ export default function StoryPanel({
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Story{headerSuffix}</span>
-          <button className="b bs" onClick={onClose}>&#x2715;</button>
+          <button className="b bs" onClick={onClose} aria-label="Close panel"><X size={16} className="ic" /></button>
         </div>
         {onSwitch && <PanelTabs active="story" onSwitch={onSwitch} />}
 

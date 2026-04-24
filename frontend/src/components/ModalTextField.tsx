@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Expand } from 'lucide-react'
 import EditorModal from './EditorModal'
 
 interface Props {
@@ -25,7 +26,7 @@ export default function ModalTextField({
         title="Click to edit"
       >
         <span className="mtf-v">{empty ? (placeholder || 'Click to edit…') : value}</span>
-        <span className="mtf-i" aria-hidden>&#x2922;</span>
+        <span className="mtf-i" aria-hidden><Expand size={12} className="ic" /></span>
       </button>
       {open && (
         <EditorModal

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Volume2 } from 'lucide-react'
 
 interface Props {
   containerRef: React.RefObject<HTMLDivElement | null>
@@ -117,8 +118,9 @@ export default function SelectionToolbar({ containerRef, onReplace, onTransform,
           <button
             className="b bs"
             title="Read aloud"
+            aria-label="Read aloud"
             onClick={e => { e.stopPropagation(); onReadAloud(selected); dismiss() }}
-          >&#x1f50a;</button>
+          ><Volume2 size={14} className="ic" /></button>
         </>
       )}
       {mode === 'input' && (

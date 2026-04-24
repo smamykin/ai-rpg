@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import type { LoreEntry, GalleryImage } from '../types'
 import { uid, LORE_TAGS } from '../types'
 import * as api from '../api'
@@ -147,7 +148,7 @@ export default function LoreEditor({ lore, onChange, galleryImages = [], onGener
     <>
       <button className="b bs" onClick={() => { setSelectedId(null); setCfmDelete(false) }}
         style={{ marginBottom: '.6rem' }}>
-        &#x2190; Back
+        <ArrowLeft size={14} className="ic" /> Back
       </button>
 
       {(imgs.length > 0 || onGenerateImage) && (

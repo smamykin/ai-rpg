@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Check } from 'lucide-react'
 import type { Scenario } from '../types'
 import { validateScenario } from '../types'
 import { SCENARIO_CREATION_PROMPT } from '../constants/scenarioPrompt'
@@ -120,7 +121,7 @@ export default function ScenarioPicker({ show, onClose, onPick, onEditScenario, 
             onClick={onCopyPrompt}
             title="Copy an AI prompt that helps you design a scenario; paste the JSON it returns into Import"
           >
-            {copied ? '\u2713 Prompt copied' : 'Scenario creation prompt'}
+            {copied ? <><Check size={14} className="ic ic-success" /> Prompt copied</> : 'Scenario creation prompt'}
           </button>
           <button className="b bs" disabled={importing} onClick={onPasteImport}>
             {importing ? 'Importing...' : 'Paste'}

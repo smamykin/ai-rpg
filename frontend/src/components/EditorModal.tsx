@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 
 interface ExtraAction {
   label: string
@@ -48,7 +49,7 @@ export default function EditorModal({ title, value, placeholder, onSave, onClose
       <div className="emd" onClick={e => e.stopPropagation()}>
         <div className="emd-h">
           <span>{title}</span>
-          <button className="b bs" onClick={onClose} aria-label="Close">&#x2715;</button>
+          <button className="b bs" onClick={onClose} aria-label="Close"><X size={16} className="ic" /></button>
         </div>
         <textarea
           ref={ta}

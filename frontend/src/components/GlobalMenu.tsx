@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Menu } from 'lucide-react'
 import SettingsPanel from './panels/SettingsPanel'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
 import { useTTS } from '../hooks/useTTS'
@@ -22,7 +23,7 @@ export default function GlobalMenu({ state, dispatch, setField }: Props) {
         onClick={() => setShow(s => !s)}
         title="Settings"
         aria-label="Settings"
-      >&#x2630;</button>
+      ><Menu size={16} className="ic" /></button>
       <SettingsPanel
         show={show}
         onClose={() => setShow(false)}

@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import type { Toast as ToastType } from '../hooks/useToast'
 
 interface Props {
@@ -12,7 +13,7 @@ export default function ToastContainer({ toasts, onDismiss }: Props) {
       {toasts.map(t => (
         <div key={t.id} className={`t t-${t.type[0]}`}>
           <span>{t.message}</span>
-          <button className="t-x" onClick={() => onDismiss(t.id)}>&#x2715;</button>
+          <button className="t-x" onClick={() => onDismiss(t.id)} aria-label="Dismiss"><X size={14} className="ic" /></button>
         </div>
       ))}
     </div>
