@@ -28,11 +28,13 @@ type GameState struct {
 	ReasoningEffort string   `json:"reasoningEffort,omitempty"`
 	Arc             string   `json:"arc"`
 	Diff         string      `json:"diff"`
-	Lore         []LoreEntry `json:"lore"`
-	Secs         []Section   `json:"secs"`
-	Notes        []Note      `json:"notes"`
-	AuFreq       int         `json:"auFreq"`
-	TTS          TTSSettings `json:"tts"`
+	Lore              []LoreEntry   `json:"lore"`
+	Secs              []Section     `json:"secs"`
+	Notes             []Note        `json:"notes"`
+	RollVariants      []RollVariant `json:"rollVariants"`
+	DiceRulesLoreID   string        `json:"diceRulesLoreId,omitempty"`
+	AuFreq            int           `json:"auFreq"`
+	TTS               TTSSettings   `json:"tts"`
 
 	// Chapters (v6)
 	Chapters         []Chapter `json:"chapters"`
@@ -166,19 +168,38 @@ type Note struct {
 	UpdatedAt int64  `json:"updatedAt,omitempty"`
 }
 
+// DiceSpec is one die definition inside a RollVariant: a dice expression like
+// "2d6" paired with a free-form type label (e.g. "red", "blue") that appears
+// in the formatted roll text.
+type DiceSpec struct {
+	Dice string `json:"dice"`
+	Type string `json:"type"`
+}
+
+// RollVariant is a named bundle of dice the player can invoke before an action.
+// The dice-rules lore entry is shared across all variants and stored on the
+// GameState / Scenario as DiceRulesLoreID.
+type RollVariant struct {
+	ID   string     `json:"id"`
+	Name string     `json:"name"`
+	Dice []DiceSpec `json:"dice"`
+}
+
 // Scenario is a reusable session template (overview + style + lore + sections).
 type Scenario struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Overview    string      `json:"overview"`
-	CStyle      string      `json:"cStyle"`
-	Style       string      `json:"style"`
-	Diff        string      `json:"diff"`
-	Lore        []LoreEntry `json:"lore"`
-	Secs        []Section   `json:"secs"`
-	CreatedAt   int64       `json:"createdAt"`
-	UpdatedAt   int64       `json:"updatedAt"`
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Overview     string        `json:"overview"`
+	CStyle       string        `json:"cStyle"`
+	Style        string        `json:"style"`
+	Diff         string        `json:"diff"`
+	Lore            []LoreEntry   `json:"lore"`
+	Secs            []Section     `json:"secs"`
+	RollVariants    []RollVariant `json:"rollVariants"`
+	DiceRulesLoreID string        `json:"diceRulesLoreId,omitempty"`
+	CreatedAt       int64         `json:"createdAt"`
+	UpdatedAt       int64         `json:"updatedAt"`
 }
 
 // Migrate brings state to the current format. For any pre-V6 session, it wipes
@@ -220,6 +241,10 @@ func (s *GameState) Migrate() bool {
 	}
 	if s.Notes == nil {
 		s.Notes = []Note{}
+		changed = true
+	}
+	if s.RollVariants == nil {
+		s.RollVariants = []RollVariant{}
 		changed = true
 	}
 	if s.ModelRoles == nil {
@@ -313,6 +338,7 @@ func DefaultState() *GameState {
 		Lore:               []LoreEntry{},
 		Secs:               []Section{},
 		Notes:              []Note{},
+		RollVariants:       []RollVariant{},
 		Chapters:           []Chapter{},
 		EffectiveCtxTokens: 32000,
 		Format:             FormatV6,

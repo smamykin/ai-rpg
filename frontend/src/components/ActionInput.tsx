@@ -1,11 +1,14 @@
-import { useState, useCallback } from 'react'
-import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, Brain } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, Brain, ChevronDown } from 'lucide-react'
+import type { RollVariant } from '../types'
+import { rollVariant as rollVariantDice, formatRolled } from '../utils/dice'
 
 interface Props {
   gen: boolean
   busy?: boolean // gen || summing — disables interactive controls without swapping Submit→Stop
   story: string
-  onSubmit: (action: string) => void
+  rollVariants: RollVariant[]
+  onSubmit: (action: string, hasRolls?: boolean) => void
   onContinue: () => void
   onRegen: () => void
   onDelete: () => void
@@ -26,19 +29,32 @@ interface Props {
 }
 
 export default function ActionInput({
-  gen, busy, story, onSubmit, onContinue, onRegen, onDelete, onStop,
+  gen, busy, story, rollVariants, onSubmit, onContinue, onRegen, onDelete, onStop,
   showArc, onToggleArc, arc, onArcChange,
   secsLength, onShowTracking,
   onSpeak, canSpeak, ttsBusy, onStopTTS,
   thinkingSupported, thinkingOn, onToggleThinking,
 }: Props) {
   const [action, setAction] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const hasRollsRef = useRef(false)
+  const diceCountRef = useRef(0)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
   const blocked = busy ?? gen
+
+  const resetRolls = () => {
+    hasRollsRef.current = false
+    diceCountRef.current = 0
+  }
 
   const handleSubmit = useCallback(() => {
     if (!action.trim() || blocked) return
-    onSubmit(action.trim())
+    const had = hasRollsRef.current
+    onSubmit(action.trim(), had)
     setAction('')
+    resetRolls()
   }, [action, blocked, onSubmit])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -50,6 +66,69 @@ export default function ActionInput({
     const el = e.currentTarget
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 110) + 'px'
+  }
+
+  const pickVariant = (v: RollVariant) => {
+    const rolled = rollVariantDice(v)
+    const text = formatRolled(rolled, diceCountRef.current + 1)
+    diceCountRef.current += rolled.length
+    hasRollsRef.current = true
+    setAction(prev => {
+      const trimmed = prev.trimEnd()
+      if (!trimmed) return text
+      const sep = /[.!?]$/.test(trimmed) ? ' ' : '. '
+      return trimmed + sep + text
+    })
+    setMenuOpen(false)
+    setQuery('')
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    // Focus the search input when the menu opens
+    const t = setTimeout(() => searchRef.current?.focus(), 0)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      clearTimeout(t)
+    }
+  }, [menuOpen])
+
+  const filteredVariants = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return rollVariants
+    return rollVariants.filter(v => {
+      if (v.name.toLowerCase().includes(q)) return true
+      return v.dice.some(d =>
+        d.dice.toLowerCase().includes(q) || (d.type || '').toLowerCase().includes(q),
+      )
+    })
+  }, [rollVariants, query])
+
+  const handleMenuKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { e.preventDefault(); setMenuOpen(false); setQuery('') }
+    if (e.key === 'Enter' && filteredVariants.length > 0) {
+      e.preventDefault()
+      pickVariant(filteredVariants[0])
+    }
+  }
+
+  const canRoll = !blocked && rollVariants.length > 0
+  const rollTitle = rollVariants.length === 0
+    ? 'Define a roll variant in Story → Rolls first'
+    : 'Roll a variant (appends to action)'
+
+  const renderMainButton = () => {
+    if (gen) return <button className="b bs" onClick={onStop} style={{ minHeight: 40 }} aria-label="Stop generation"><Square size={18} className="ic ic-danger" fill="currentColor" /></button>
+    if (action.trim()) return <button className="b ba" onClick={handleSubmit} disabled={blocked} style={{ minHeight: 40 }} aria-label="Submit action"><Play size={18} className="ic" fill="currentColor" /></button>
+    if (!story.trim()) return <button className="b ba" onClick={onContinue} disabled={blocked} style={{ minHeight: 40, padding: '0 .9rem' }}>Begin</button>
+    return <button className="b" onClick={onContinue} disabled={blocked} style={{ minHeight: 40 }} aria-label="Continue"><SkipForward size={18} className="ic" fill="currentColor" /></button>
   }
 
   return (
@@ -85,15 +164,51 @@ export default function ActionInput({
             rows={1}
             onInput={handleInput}
           />
-          {gen ? (
-            <button className="b bs" onClick={onStop} style={{ minHeight: 40 }} aria-label="Stop generation"><Square size={18} className="ic ic-danger" fill="currentColor" /></button>
-          ) : action.trim() ? (
-            <button className="b ba" onClick={handleSubmit} disabled={blocked} style={{ minHeight: 40 }} aria-label="Submit action"><Play size={18} className="ic" fill="currentColor" /></button>
-          ) : !story.trim() ? (
-            <button className="b ba" onClick={onContinue} disabled={blocked} style={{ minHeight: 40, padding: '0 .9rem' }}>Begin</button>
-          ) : (
-            <button className="b" onClick={onContinue} disabled={blocked} style={{ minHeight: 40 }} aria-label="Continue"><SkipForward size={18} className="ic" fill="currentColor" /></button>
-          )}
+          <div className="sb" ref={wrapRef}>
+            {renderMainButton()}
+            {!gen && (
+              <button
+                className="b"
+                onClick={() => setMenuOpen(o => !o)}
+                disabled={!canRoll}
+                title={rollTitle}
+                aria-label="Roll dice variant"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                style={{ minHeight: 40 }}
+              ><ChevronDown size={16} className="ic" /></button>
+            )}
+            {menuOpen && (
+              <div className="dd" role="menu">
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={handleMenuKey}
+                  placeholder="Search variants..."
+                  style={{ fontSize: '.82rem', padding: '.35rem .5rem', marginBottom: '.25rem' }}
+                />
+                {filteredVariants.length === 0 ? (
+                  <div style={{ padding: '.4rem .55rem', fontSize: '.8rem', color: 'var(--mt)' }}>
+                    No matches.
+                  </div>
+                ) : filteredVariants.map(v => (
+                  <button
+                    key={v.id}
+                    className="dd-i"
+                    onClick={() => pickVariant(v)}
+                    role="menuitem"
+                  >
+                    <span>{v.name || '(unnamed)'}</span>
+                    <span className="dd-i-sub">
+                      {v.dice.map(d => `${d.type ? d.type + ' ' : ''}${d.dice}`).join(', ') || 'no dice'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="ct">
           <button className="b bs" onClick={onRegen} disabled={blocked || !story.trim()} title="Regenerate" aria-label="Regenerate"><RefreshCw size={16} className="ic" /></button>

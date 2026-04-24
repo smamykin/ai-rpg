@@ -11,8 +11,9 @@ import (
 )
 
 type GenerateRequest struct {
-	Task   string `json:"task"`   // "open", "action", "continue"
-	Action string `json:"action"` // player's action text (for task="action")
+	Task     string `json:"task"`   // "open", "action", "continue"
+	Action   string `json:"action"` // player's action text (for task="action")
+	HasRolls bool   `json:"hasRolls,omitempty"`
 }
 
 type SummarizeRequest struct {
@@ -100,7 +101,7 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 		active.AppendTurn(req.Action, "")
 	}
 
-	prompt := game.BuildPrompt(state, req.Task, req.Action)
+	prompt := game.BuildPrompt(state, req.Task, req.Action, req.HasRolls)
 	maxTokens := game.MaxTokensForStyle(state.Style)
 
 	// Set up SSE
@@ -355,7 +356,7 @@ func (h *Handlers) PromptPreview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	preview := game.BuildPromptPreview(state, req.Task, req.Action)
+	preview := game.BuildPromptPreview(state, req.Task, req.Action, req.HasRolls)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(preview)

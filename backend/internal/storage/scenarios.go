@@ -83,6 +83,9 @@ func (s *ScenarioStore) Get(id string) (*game.Scenario, error) {
 	if sc.Secs == nil {
 		sc.Secs = []game.Section{}
 	}
+	if sc.RollVariants == nil {
+		sc.RollVariants = []game.RollVariant{}
+	}
 	if game.NormalizeLoreTags(sc.Lore) {
 		_ = s.write(&sc)
 	}
@@ -109,6 +112,9 @@ func (s *ScenarioStore) Create(in *game.Scenario) (*game.Scenario, error) {
 	if sc.Secs == nil {
 		sc.Secs = []game.Section{}
 	}
+	if sc.RollVariants == nil {
+		sc.RollVariants = []game.RollVariant{}
+	}
 	now := time.Now().Unix()
 	sc.CreatedAt = now
 	sc.UpdatedAt = now
@@ -131,6 +137,9 @@ func (s *ScenarioStore) Update(id string, in *game.Scenario) (*game.Scenario, er
 	}
 	if in.Secs == nil {
 		in.Secs = []game.Section{}
+	}
+	if in.RollVariants == nil {
+		in.RollVariants = []game.RollVariant{}
 	}
 	if err := s.write(in); err != nil {
 		return nil, err
@@ -180,5 +189,6 @@ func (s *ScenarioStore) InstantiateSession(scenarioID string) (*game.GameState, 
 	// Deep-ish copy of slices to avoid aliasing.
 	st.Lore = append([]game.LoreEntry{}, sc.Lore...)
 	st.Secs = append([]game.Section{}, sc.Secs...)
+	st.RollVariants = append([]game.RollVariant{}, sc.RollVariants...)
 	return st, nil
 }

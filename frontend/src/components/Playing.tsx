@@ -50,6 +50,8 @@ interface Props {
     effectiveCtxTokens: number
     secs: GameState['secs']
     notes: GameState['notes']
+    rollVariants: GameState['rollVariants']
+    diceRulesLoreId?: string
     auFreq: number
     tts: TTSSettings
     lastNarrationId: number
@@ -62,7 +64,7 @@ interface Props {
   dispatch: React.Dispatch<any>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   actions: {
-    submit: (action: string) => void
+    submit: (action: string, hasRolls?: boolean) => void
     cont: () => void
     regen: () => void
     deleteLast: () => void
@@ -431,6 +433,8 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         show={activePanel === 'story'} onClose={() => setActivePanel(null)}
         lore={state.lore}
         notes={state.notes || []}
+        rollVariants={state.rollVariants || []}
+        diceRulesLoreId={state.diceRulesLoreId || ''}
         dispatch={dispatch}
         galleryImages={gallery.images}
         onGenerateImage={(loreId) => openGenModal('lore', loreId)}
@@ -642,6 +646,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         gen={state.gen}
         busy={state.gen || state.summing || !computed.isViewingActive || budget === 'block'}
         story={viewingContent}
+        rollVariants={state.rollVariants || []}
         onSubmit={actions.submit}
         onContinue={actions.cont}
         onRegen={actions.regen}

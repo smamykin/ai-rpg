@@ -75,6 +75,26 @@ body {
 .ba:hover:not(:disabled) { background: var(--ac); }
 .bs { padding: .35rem .6rem; font-size: .78rem; }
 
+/* Split-button: primary action + chevron sibling that drops a variant menu. */
+.sb { position: relative; display: inline-flex; align-items: stretch; gap: 0; }
+.sb > .b:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right-width: 0; }
+.sb > .b:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: .35rem; padding-right: .35rem; }
+.dd {
+  position: absolute; bottom: calc(100% + 4px); right: 0; z-index: 40;
+  min-width: 180px; max-width: 280px; max-height: 280px; overflow-y: auto;
+  background: var(--sf); border: 1px solid var(--bd); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5); padding: .25rem;
+  display: flex; flex-direction: column; gap: .15rem;
+}
+.dd-i {
+  background: none; border: none; color: var(--tx); text-align: left;
+  padding: .4rem .55rem; border-radius: 6px; font-size: .82rem;
+  cursor: pointer; display: flex; flex-direction: column; gap: .1rem;
+}
+.dd-i:hover:not(:disabled) { background: var(--sf2); }
+.dd-i:disabled { opacity: .4; cursor: default; }
+.dd-i-sub { font-size: .7rem; color: var(--mt); }
+
 /* Form inputs */
 textarea, select, input[type=text], input[type=number], input[type=password], input[type=search] {
   background: var(--sf);

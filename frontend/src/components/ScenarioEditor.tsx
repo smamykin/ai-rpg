@@ -3,17 +3,19 @@ import { X } from 'lucide-react'
 import type { GameState, Scenario, Section } from '../types'
 import { defaultScenario, STYLES, uid } from '../types'
 import LoreEditor from './LoreEditor'
+import RollVariantsEditor from './RollVariantsEditor'
 import SuggestNameButton from './SuggestNameButton'
 import ExpandableTextarea from './ExpandableTextarea'
 import GlobalMenu from './GlobalMenu'
 import * as api from '../api'
 
-type EditorTab = 'main' | 'lore' | 'tracked'
+type EditorTab = 'main' | 'lore' | 'tracked' | 'rolls'
 
 const TABS: { id: EditorTab; label: string }[] = [
   { id: 'main', label: 'Main' },
   { id: 'lore', label: 'Lore' },
   { id: 'tracked', label: 'Tracked' },
+  { id: 'rolls', label: 'Rolls' },
 ]
 
 const MAX_SECS = 5
@@ -148,6 +150,7 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
             >
               {t.id === 'lore' && sc.lore.length > 0 ? `${t.label} (${sc.lore.length})`
                 : t.id === 'tracked' && sc.secs.length > 0 ? `${t.label} (${sc.secs.length})`
+                : t.id === 'rolls' && (sc.rollVariants?.length || 0) > 0 ? `${t.label} (${sc.rollVariants.length})`
                 : t.label}
             </button>
           ))}
@@ -304,6 +307,19 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
                 No tracked entries yet. Add one above to pre-fill session state.
               </p>
             )}
+          </div>
+        )}
+
+        {tab === 'rolls' && (
+          <div style={{ width: '100%' }}>
+            <RollVariantsEditor
+              variants={sc.rollVariants || []}
+              lore={sc.lore}
+              diceRulesLoreId={sc.diceRulesLoreId || ''}
+              onChange={next => update('rollVariants', next)}
+              onSetRulesLore={id => update('diceRulesLoreId', id)}
+              onAddLore={entry => update('lore', [...sc.lore, entry])}
+            />
           </div>
         )}
 

@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import type { LoreEntry, Note, GalleryImage, GameState } from '../../types'
+import type { LoreEntry, Note, RollVariant, GalleryImage, GameState } from '../../types'
 import { STYLES } from '../../types'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
 import LoreEditor from '../LoreEditor'
 import NotesEditor from '../NotesEditor'
+import RollVariantsEditor from '../RollVariantsEditor'
 import ModalTextField from '../ModalTextField'
 
-type SubTab = 'main' | 'lore' | 'notes'
+type SubTab = 'main' | 'lore' | 'notes' | 'rolls'
 
 interface Props {
   show: boolean
   onClose: () => void
   lore: LoreEntry[]
   notes: Note[]
+  rollVariants: RollVariant[]
+  diceRulesLoreId: string
   dispatch: React.Dispatch<any>
   galleryImages?: GalleryImage[]
   onGenerateImage?: (loreId: string) => void
@@ -30,7 +33,7 @@ interface Props {
 }
 
 export default function StoryPanel({
-  show, onClose, lore, notes, dispatch,
+  show, onClose, lore, notes, rollVariants, diceRulesLoreId, dispatch,
   galleryImages = [], onGenerateImage,
   story = '', overview, summariesText = '',
   onSwitch,
@@ -40,7 +43,8 @@ export default function StoryPanel({
   const enabledCount = lore.filter(l => l.enabled).length
   const headerSuffix =
     sub === 'lore' ? ` \u2014 Lore (${enabledCount}/${lore.length})` :
-    sub === 'notes' ? ` \u2014 Notes (${notes.length})` : ''
+    sub === 'notes' ? ` \u2014 Notes (${notes.length})` :
+    sub === 'rolls' ? ` \u2014 Rolls (${rollVariants.length})` : ''
 
   return (
     <>
@@ -56,6 +60,7 @@ export default function StoryPanel({
           <button className={`pt-t${sub === 'main' ? ' pt-a' : ''}`} onClick={() => setSub('main')}>Main</button>
           <button className={`pt-t${sub === 'lore' ? ' pt-a' : ''}`} onClick={() => setSub('lore')}>Lore</button>
           <button className={`pt-t${sub === 'notes' ? ' pt-a' : ''}`} onClick={() => setSub('notes')}>Notes</button>
+          <button className={`pt-t${sub === 'rolls' ? ' pt-a' : ''}`} onClick={() => setSub('rolls')}>Rolls</button>
         </div>
 
         {sub === 'main' ? (
@@ -100,12 +105,21 @@ export default function StoryPanel({
             onGenerateImage={onGenerateImage}
             aiContext={{ story, overview, summaries: summariesText }}
           />
-        ) : (
+        ) : sub === 'notes' ? (
           <NotesEditor
             notes={notes}
             onAdd={note => dispatch({ type: 'ADD_NOTE', note })}
             onUpdate={(id, body) => dispatch({ type: 'UPDATE_NOTE', id, body })}
             onDelete={id => dispatch({ type: 'DELETE_NOTE', id })}
+          />
+        ) : (
+          <RollVariantsEditor
+            variants={rollVariants}
+            lore={lore}
+            diceRulesLoreId={diceRulesLoreId}
+            onChange={next => dispatch({ type: 'SET_ROLL_VARIANTS', variants: next })}
+            onSetRulesLore={id => dispatch({ type: 'SET_FIELD', field: 'diceRulesLoreId', value: id })}
+            onAddLore={entry => dispatch({ type: 'ADD_LORE', entry })}
           />
         )}
       </div>

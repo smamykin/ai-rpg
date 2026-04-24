@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
-import type { Chapter, GameState, LoreEntry, Note, Section, Phase, TTSModelSettings, Turn } from '../types'
+import type { Chapter, GameState, LoreEntry, Note, RollVariant, Section, Phase, TTSModelSettings, Turn } from '../types'
 import { defaultState, getActiveChapter, getViewingChapter, newChapterId, newTurnId, renderChapterContent, wordCount } from '../types'
 import { expandShortcut } from '../utils/shortcuts'
 import * as api from '../api'
@@ -47,6 +47,7 @@ type Action =
   | { type: 'ADD_NOTE'; note: Note }
   | { type: 'UPDATE_NOTE'; id: string; body: string }
   | { type: 'DELETE_NOTE'; id: string }
+  | { type: 'SET_ROLL_VARIANTS'; variants: RollVariant[] }
   | { type: 'LOAD_STATE'; state: GameState }
   | { type: 'ENTER_HUB' }
   | { type: 'RESET' }
@@ -129,6 +130,9 @@ function reducer(state: State, action: Action): State {
     case 'DELETE_NOTE':
       return { ...state, notes: (state.notes || []).filter(n => n.id !== action.id) }
 
+    case 'SET_ROLL_VARIANTS':
+      return { ...state, rollVariants: action.variants }
+
     case 'LOAD_STATE': {
       const loaded = action.state
       // Backend omits empty turns arrays; normalize so callers can iterate freely.
@@ -142,6 +146,8 @@ function reducer(state: State, action: Action): State {
         chapters,
         archivedChapters,
         notes: loaded.notes || [],
+        rollVariants: loaded.rollVariants || [],
+        diceRulesLoreId: loaded.diceRulesLoreId || '',
         tts: loaded.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
         phase: hasPlayContent ? 'playing' : 'setup',
         loaded: true,
@@ -234,13 +240,13 @@ function toRoman(n: number): string {
 function toPersistable(s: State): Partial<GameState> {
   const {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
-    lore, secs, notes, auFreq, tts,
+    lore, secs, notes, rollVariants, diceRulesLoreId, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
     effectiveCtxTokens, format,
   } = s
   return {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
-    lore, secs, notes, auFreq, tts,
+    lore, secs, notes, rollVariants, diceRulesLoreId, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
     effectiveCtxTokens, format,
   }
@@ -310,7 +316,7 @@ export function useGameState() {
     return () => clearTimeout(saveTimer.current)
   }, [
     state.name, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel,
-    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.notes, state.auFreq, state.tts,
+    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.notes, state.rollVariants, state.diceRulesLoreId, state.auFreq, state.tts,
     state.chapters, state.activeChapterId, state.viewingChapterId, state.archivedChapters,
     state.effectiveCtxTokens, state.loaded, state.phase, state.sessionId,
   ])
@@ -327,7 +333,7 @@ export function useGameState() {
   // Generate appends a new turn (or fills the pending one) on the active chapter.
   // Always operates on the active chapter regardless of what the user is viewing.
   // UI should block calls when not viewing active.
-  const generate = useCallback((task: string, actionText?: string, baseTurns?: Turn[]) => {
+  const generate = useCallback((task: string, actionText?: string, baseTurns?: Turn[], hasRolls?: boolean) => {
     const cur = stateRef.current
     const active = getActiveChapter(cur)
     if (!active) return
@@ -365,7 +371,7 @@ export function useGameState() {
     const savePromise = api.saveState(toPersistable(optimistic)).catch(() => {})
 
     savePromise.then(() => {
-      api.generate(task, actionText || '', ctrl.signal, {
+      api.generate(task, actionText || '', !!hasRolls, ctrl.signal, {
         onChunk: (text) => {
           dispatch({ type: 'SET_GEN_STAGE', stage: 'writing' })
           dispatch({ type: 'SET_STREAMING', text })
@@ -427,9 +433,9 @@ export function useGameState() {
     generate('open')
   }, [generate])
 
-  const submit = useCallback((action: string) => {
+  const submit = useCallback((action: string, hasRolls?: boolean) => {
     if (!action.trim() || state.gen || state.summing || !isViewingActive) return
-    generate('action', expandShortcut(action.trim()))
+    generate('action', expandShortcut(action.trim()), undefined, hasRolls)
   }, [generate, state.gen, state.summing, isViewingActive])
 
   const cont = useCallback(() => {

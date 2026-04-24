@@ -45,6 +45,17 @@ export interface Note {
   updatedAt: number
 }
 
+export interface DiceSpec {
+  dice: string
+  type: string
+}
+
+export interface RollVariant {
+  id: string
+  name: string
+  dice: DiceSpec[]
+}
+
 export interface TTSModelSettings {
   voice?: string
   speed?: number
@@ -77,6 +88,8 @@ export interface GameState {
   lore: LoreEntry[]
   secs: Section[]
   notes: Note[]
+  rollVariants: RollVariant[]
+  diceRulesLoreId?: string
   auFreq: number
   tts: TTSSettings
 
@@ -111,6 +124,8 @@ export interface Scenario {
   diff: string
   lore: LoreEntry[]
   secs: Section[]
+  rollVariants: RollVariant[]
+  diceRulesLoreId?: string
   createdAt: number
   updatedAt: number
 }
@@ -126,6 +141,8 @@ export function defaultScenario(): Scenario {
     diff: 'normal',
     lore: [],
     secs: [],
+    rollVariants: [],
+    diceRulesLoreId: '',
     createdAt: 0,
     updatedAt: 0,
   }
@@ -167,6 +184,27 @@ export function validateScenario(obj: unknown): Scenario | null {
     })
     : []
 
+  const rollVariants = Array.isArray(o.rollVariants)
+    ? (o.rollVariants as unknown[]).filter(e => e && typeof e === 'object').map(e => {
+      const v = e as Record<string, unknown>
+      const dice = Array.isArray(v.dice)
+        ? (v.dice as unknown[]).filter(d => d && typeof d === 'object').map(d => {
+          const ds = d as Record<string, unknown>
+          return { dice: asString(ds.dice), type: asString(ds.type) }
+        })
+        : []
+      return {
+        id: asString(v.id) || uid('rv'),
+        name: asString(v.name),
+        dice,
+      }
+    })
+    : []
+
+  const loreIds = new Set(lore.map(l => l.id))
+  const diceRulesLoreIdRaw = asString(o.diceRulesLoreId)
+  const diceRulesLoreId = loreIds.has(diceRulesLoreIdRaw) ? diceRulesLoreIdRaw : ''
+
   return {
     id: '',
     name: asString(o.name),
@@ -177,6 +215,8 @@ export function validateScenario(obj: unknown): Scenario | null {
     diff: asString(o.diff) || 'normal',
     lore,
     secs,
+    rollVariants,
+    diceRulesLoreId,
     createdAt: 0,
     updatedAt: 0,
   }
@@ -303,6 +343,8 @@ export function defaultState(): GameState {
     lore: [],
     secs: [],
     notes: [],
+    rollVariants: [],
+    diceRulesLoreId: '',
     auFreq: 0,
     tts: { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
     chapters: [{
