@@ -63,7 +63,7 @@ export default function NotesEditor({ notes, onAdd, onUpdate, onDelete }: Props)
                 title="Click to edit"
               >
                 <span className="mtf-v">{empty ? 'Empty note — click to edit…' : preview}</span>
-                <span className="mtf-i" aria-hidden><Expand size={12} className="ic" /></span>
+                <span className="mtf-i" aria-hidden><Expand size={12} className="ic ic-muted" /></span>
               </button>
             )
           })}

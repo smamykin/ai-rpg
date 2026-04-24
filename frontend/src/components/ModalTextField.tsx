@@ -26,7 +26,7 @@ export default function ModalTextField({
         title="Click to edit"
       >
         <span className="mtf-v">{empty ? (placeholder || 'Click to edit…') : value}</span>
-        <span className="mtf-i" aria-hidden><Expand size={12} className="ic" /></span>
+        <span className="mtf-i" aria-hidden><Expand size={12} className="ic ic-muted" /></span>
       </button>
       {open && (
         <EditorModal

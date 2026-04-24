@@ -49,7 +49,7 @@ export default function EditorModal({ title, value, placeholder, onSave, onClose
       <div className="emd" onClick={e => e.stopPropagation()}>
         <div className="emd-h">
           <span>{title}</span>
-          <button className="b bs" onClick={onClose} aria-label="Close"><X size={16} className="ic" /></button>
+          <button className="b bs" onClick={onClose} aria-label="Close"><X size={16} className="ic ic-muted" /></button>
         </div>
         <textarea
           ref={ta}

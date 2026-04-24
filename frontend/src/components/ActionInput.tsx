@@ -70,7 +70,7 @@ export default function ActionInput({
             title="Clear"
             style={{ padding: '.35rem .55rem' }}
             aria-label="Clear arc"
-          ><X size={16} className="ic" /></button>
+          ><X size={16} className="ic ic-muted" /></button>
         </div>
       )}
       <div className="ia">

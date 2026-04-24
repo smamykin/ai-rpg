@@ -29,7 +29,7 @@ const ExpandableTextarea = forwardRef<HTMLTextAreaElement, Props>(function Expan
         aria-label="Expand editor"
         title="Expand editor"
       >
-        <Expand size={12} className="ic" />
+        <Expand size={12} className="ic ic-muted" />
       </button>
       {open && (
         <EditorModal

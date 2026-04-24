@@ -28,13 +28,14 @@ interface Props {
   onHub: () => void
   onSaveAsScenario: () => void
   canSaveAsScenario: boolean
+  onShowCheatsheet: () => void
 }
 
 export default function OutlinePanel({
   show, onClose, chapters, archivedChapters, activeChapterId, viewingChapterId, busy,
   onOpen, onEndChapter, onResummarize, onRenameChapter, onDeleteChapter, onUnarchive,
   onCreateAct, onUnactAct,
-  onSave, onExportMd, onLoad, onHub, onSaveAsScenario, canSaveAsScenario,
+  onSave, onExportMd, onLoad, onHub, onSaveAsScenario, canSaveAsScenario, onShowCheatsheet,
 }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -174,7 +175,7 @@ export default function OutlinePanel({
       <div className={`pnl ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Outline</span>
-          <button className="b bs" onClick={onClose} aria-label="Close outline"><X size={16} className="ic" /></button>
+          <button className="b bs" onClick={onClose} aria-label="Close outline"><X size={16} className="ic ic-muted" /></button>
         </div>
 
         <div style={{ marginBottom: '.75rem' }}>
@@ -248,6 +249,7 @@ export default function OutlinePanel({
           <button className="b bs" onClick={() => { onSave(); onClose() }} style={{ justifyContent: 'flex-start' }}>Export JSON</button>
           <button className="b bs" onClick={() => { onExportMd(); onClose() }} style={{ justifyContent: 'flex-start' }}>Export MD</button>
           <button className="b bs" onClick={() => { onLoad(); onClose() }} style={{ justifyContent: 'flex-start' }}>Import JSON</button>
+          <button className="b bs" onClick={() => { onShowCheatsheet() }} style={{ justifyContent: 'flex-start' }}>Cheatsheet</button>
         </div>
 
         {/* Danger zone */}

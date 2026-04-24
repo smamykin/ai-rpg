@@ -52,7 +52,7 @@ export default function GalleryPanel({ show, onClose, images, currentSessionId, 
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Gallery</span>
-          <button className="b bs" onClick={onClose} aria-label="Close gallery"><X size={16} className="ic" /></button>
+          <button className="b bs" onClick={onClose} aria-label="Close gallery"><X size={16} className="ic ic-muted" /></button>
         </div>
         {onSwitch && <PanelTabs active="gallery" onSwitch={onSwitch} />}
 
@@ -96,7 +96,7 @@ export default function GalleryPanel({ show, onClose, images, currentSessionId, 
                 <img src={img.url} alt="" loading="lazy" />
                 <div className="gi-ov">
                   <button className="b bs" style={{ fontSize: '.65rem', padding: '.15rem .3rem' }}
-                    onClick={e => { e.stopPropagation(); download(img) }} aria-label="Download image"><Download size={12} className="ic" /></button>
+                    onClick={e => { e.stopPropagation(); download(img) }} aria-label="Download image"><Download size={12} className="ic ic-muted" /></button>
                   <button className="b bs" style={{ fontSize: '.65rem', padding: '.15rem .3rem' }}
                     onClick={e => { e.stopPropagation(); onDelete(img.id) }} aria-label="Delete image"><X size={12} className="ic ic-danger" /></button>
                 </div>

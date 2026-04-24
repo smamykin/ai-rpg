@@ -10,6 +10,7 @@ import PromptPanel from './panels/PromptPanel'
 import GenerateImageModal from './GenerateImageModal'
 import SaveAsScenarioModal from './SaveAsScenarioModal'
 import RewindModal from './RewindModal'
+import CheatsheetModal from './CheatsheetModal'
 import Lightbox from './Lightbox'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
@@ -98,6 +99,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
   const [showRewind, setShowRewind] = useState(false)
   const [showArc, setShowArc] = useState(false)
   const [showSaveAsScenario, setShowSaveAsScenario] = useState(false)
+  const [showCheatsheet, setShowCheatsheet] = useState(false)
   const [pinScroll, setPinScroll] = useState(true)
   const [scrollReq, setScrollReq] = useState(0)
 
@@ -308,6 +310,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         case 'o': setShowOutline(s => !s); break
         case 'Escape': setActivePanel(null); setShowOutline(false); break
         case 'a': setShowArc(a => !a); break
+        case '?': setShowCheatsheet(s => !s); break
         case '/': {
           e.preventDefault()
           const textarea = document.querySelector('.ai') as HTMLTextAreaElement
@@ -415,6 +418,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onHub={actions.enterHub}
         onSaveAsScenario={() => setShowSaveAsScenario(true)}
         canSaveAsScenario={!state.gen}
+        onShowCheatsheet={() => { setShowCheatsheet(true); setShowOutline(false) }}
       />
 
       {/* Panels */}
@@ -513,6 +517,11 @@ export default function Playing({ state, dispatch, setField, actions, computed }
           lore: state.lore,
           secs: state.secs,
         }}
+      />
+
+      <CheatsheetModal
+        show={showCheatsheet}
+        onClose={() => setShowCheatsheet(false)}
       />
 
       {/* Viewing-chapter banner (shown when user is browsing a non-active chapter) */}

@@ -94,7 +94,7 @@ export default function SettingsPanel({
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Settings</span>
-          <button className="b bs" onClick={onClose} aria-label="Close settings"><X size={16} className="ic" /></button>
+          <button className="b bs" onClick={onClose} aria-label="Close settings"><X size={16} className="ic ic-muted" /></button>
         </div>
         {onSwitch && <PanelTabs active="settings" onSwitch={onSwitch} visibleTabs={visibleTabs} />}
 

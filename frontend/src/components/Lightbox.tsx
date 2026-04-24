@@ -47,7 +47,7 @@ export default function Lightbox({ images, index, onClose, onNavigate, onDelete,
 
   return (
     <div className="lbx" onClick={onClose}>
-      <button className="b bs lbx-cl" onClick={onClose} aria-label="Close"><X size={18} className="ic" /></button>
+      <button className="b bs lbx-cl" onClick={onClose} aria-label="Close"><X size={18} className="ic ic-muted" /></button>
 
       {hasPrev && (
         <button
@@ -79,7 +79,7 @@ export default function Lightbox({ images, index, onClose, onNavigate, onDelete,
           pinnedBgId === img.id ? (
             <button className="b bs ba" onClick={() => onSetBg(null)}><Pin size={14} className="ic" fill="currentColor" /> Pinned</button>
           ) : (
-            <button className="b bs" onClick={() => onSetBg(img.id)}><Pin size={14} className="ic ic-pin" /> Pin as BG</button>
+            <button className="b bs" onClick={() => onSetBg(img.id)}><Pin size={14} className="ic ic-hl" /> Pin as BG</button>
           )
         )}
         {onDelete && (

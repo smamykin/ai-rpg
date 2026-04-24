@@ -77,7 +77,7 @@ export default function PromptPanel({ show, onClose, onSwitch, sessionId, hasAct
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Prompt preview</span>
-          <button className="b bs" onClick={onClose} aria-label="Close panel"><X size={16} className="ic" /></button>
+          <button className="b bs" onClick={onClose} aria-label="Close panel"><X size={16} className="ic ic-muted" /></button>
         </div>
         {onSwitch && <PanelTabs active="prompt" onSwitch={onSwitch} />}
 

@@ -12,18 +12,19 @@
   --crt: #4f8a5a;
   --loc: #7a9e9f;
   --fac: #b87333;
+  --ic: #e8e0d4;
+  --ic-hl: #6ecbe8;
   --story-font: 'Crimson Pro';
   --story-size: 1.1rem;
   --editor-font: 'Crimson Pro';
   --editor-size: 1rem;
 }
 
-.ic { display: inline-block; vertical-align: -.15em; flex-shrink: 0; }
-.ic-danger { color: var(--dng); }
-.ic-accent { color: var(--ac); }
-.ic-pin { color: var(--ac); }
-.ic-success { color: var(--crt); }
+.ic { display: inline-block; vertical-align: -.15em; flex-shrink: 0; color: var(--ic); }
+.ic-hl { color: var(--ic-hl); }
 .ic-muted { color: var(--mt); }
+.ic-danger { color: var(--dng); }
+.ic-success { color: var(--crt); }
 .b:hover .ic-danger-hover { color: var(--dng); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -569,6 +570,14 @@ select {
 .mdl { position: fixed; z-index: 61; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--sf); border: 1px solid var(--bd); border-radius: 10px; padding: 1.1rem 1.25rem; width: calc(100% - 2rem); max-width: 560px; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
 .mdl-h { font-size: 1.05rem; font-weight: 600; color: var(--ac); }
 .mdl-f { display: flex; justify-content: flex-end; gap: .4rem; flex-wrap: wrap; }
+
+/* Cheatsheet modal */
+.kbd { display: inline-block; min-width: 1.4rem; padding: .05rem .35rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .72rem; line-height: 1.25; text-align: center; color: var(--tx); background: var(--sf2); border: 1px solid var(--bd); border-bottom-width: 2px; border-radius: 4px; white-space: nowrap; }
+.chs { display: flex; flex-direction: column; gap: .9rem; overflow-y: auto; max-height: 70vh; padding-right: .25rem; }
+.chs h4 { margin: 0 0 .35rem 0; font-size: .82rem; font-weight: 600; color: var(--ac); text-transform: uppercase; letter-spacing: .04em; }
+.chs-row { display: grid; grid-template-columns: minmax(6rem, auto) 1fr; gap: .6rem .8rem; align-items: baseline; font-size: .82rem; line-height: 1.45; }
+.chs-row > div:nth-child(odd) { color: var(--mt); }
+.chs-row code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--sf2); padding: 0 .25rem; border-radius: 3px; font-size: .78rem; }
 
 /* Scenario picker cards */
 .spk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }

@@ -112,7 +112,7 @@ export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRen
                         onSuggest={n => setEditName(n)}
                       />
                       <button className="sgn" onClick={commitEdit} title="Save name" aria-label="Save name"><Check size={14} className="ic ic-success" /> Save</button>
-                      <button className="sgn" onClick={() => setEditingId(null)} title="Cancel" aria-label="Cancel edit"><X size={14} className="ic" /></button>
+                      <button className="sgn" onClick={() => setEditingId(null)} title="Cancel" aria-label="Cancel edit"><X size={14} className="ic ic-muted" /></button>
                     </div>
                   ) : (
                     <div className="hub-name">{s.name || 'Adventure'}</div>

@@ -30,7 +30,7 @@ export default function TrackingPanel({
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
           <span>Tracking</span>
-          <button className="b bs" onClick={onClose} aria-label="Close tracking"><X size={16} className="ic" /></button>
+          <button className="b bs" onClick={onClose} aria-label="Close tracking"><X size={16} className="ic ic-muted" /></button>
         </div>
         {onSwitch && <PanelTabs active="track" onSwitch={onSwitch} />}
 
@@ -53,7 +53,7 @@ export default function TrackingPanel({
           <div key={s.id} className="sc">
             <div className="sh">
               <span className="sn">{s.name}</span>
-              <button className="b bs" onClick={() => dispatch({ type: 'REMOVE_SEC', id: s.id })} style={{ padding: '.15rem .4rem', fontSize: '.68rem' }} aria-label="Remove section"><X size={12} className="ic" /></button>
+              <button className="b bs" onClick={() => dispatch({ type: 'REMOVE_SEC', id: s.id })} style={{ padding: '.15rem .4rem', fontSize: '.68rem' }} aria-label="Remove section"><X size={12} className="ic ic-muted" /></button>
             </div>
             {s.description && <div className="sd">{s.description}</div>}
             <textarea

@@ -37,7 +37,7 @@ export default function SuggestNameButton({ kind, text, tag, context, disabled, 
       title={err || 'Suggest a name'}
       style={err ? { borderColor: 'var(--dng)', color: 'var(--dng)' } : undefined}
     >
-      {busy ? <span className="sgn-sp"><RotateCw size={12} className="ic" /></span> : err ? <AlertTriangle size={12} className="ic ic-danger" /> : <Sparkles size={12} className="ic ic-accent" />} {label ?? 'Suggest'}
+      {busy ? <span className="sgn-sp"><RotateCw size={12} className="ic" /></span> : err ? <AlertTriangle size={12} className="ic ic-danger" /> : <Sparkles size={12} className="ic ic-hl" />} {label ?? 'Suggest'}
     </button>
   )
 }
