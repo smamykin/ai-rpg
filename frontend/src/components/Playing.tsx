@@ -214,6 +214,11 @@ export default function Playing({ state, dispatch, setField, actions, computed }
     const el = rootRef.current
     if (!el) return
     const onStart = (e: TouchEvent) => {
+      const target = e.target as Element | null
+      if (target && target.closest('.tn-imgs')) {
+        touchStart.current = null
+        return
+      }
       touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
     }
     const onEnd = (e: TouchEvent) => {

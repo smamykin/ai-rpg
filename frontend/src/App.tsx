@@ -53,6 +53,9 @@ function App() {
           setEditingScenarioId(null)
           dispatch({ type: 'ENTER_HUB' })
         }}
+        state={state}
+        dispatch={dispatch}
+        setField={setField}
       />
     )
   }
