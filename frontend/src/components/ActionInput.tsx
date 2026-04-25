@@ -84,8 +84,9 @@ export default function ActionInput({
   }, [menuOpen])
 
   const canRoll = !blocked && rollVariants.length > 0
-  const rollTitle = rollVariants.length === 0
-    ? 'Define a roll variant in Story → Rolls first'
+  const rollTitle =
+    rollVariants.length === 0 ? 'Define a roll variant in Story → Rolls first'
+    : rollVariants.length === 1 ? `Roll ${rollVariants[0].name || 'variant'} (submits immediately)`
     : 'Roll a variant (submits immediately)'
 
   const renderMainButton = () => {
@@ -128,44 +129,45 @@ export default function ActionInput({
             rows={1}
             onInput={handleInput}
           />
-          <div className="sb" ref={wrapRef}>
-            {renderMainButton()}
-            {!gen && (
-              <button
-                className="b"
-                onClick={() => setMenuOpen(o => !o)}
-                disabled={!canRoll}
-                title={rollTitle}
-                aria-label="Roll dice variant"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                style={{ minHeight: 40 }}
-              ><ChevronDown size={16} className="ic" /></button>
-            )}
-            {menuOpen && (
-              <div className="dd" role="menu">
-                {rollVariants.length === 0 ? (
-                  <div style={{ padding: '.4rem .55rem', fontSize: '.8rem', color: 'var(--mt)' }}>
-                    No variants.
-                  </div>
-                ) : rollVariants.map(v => (
-                  <button
-                    key={v.id}
-                    className="dd-i"
-                    onClick={() => pickVariant(v)}
-                    role="menuitem"
-                  >
-                    <span>{v.name || '(unnamed)'}</span>
-                    <span className="dd-i-sub">
-                      {v.dice.map(d => `${d.type ? d.type + ' ' : ''}${diceExpr(d)}`).join(', ') || 'no dice'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {renderMainButton()}
         </div>
         <div className="ct">
+          {!gen && (
+            <div ref={wrapRef} style={{ position: 'relative' }}>
+              <button
+                className="b bs"
+                onClick={() => {
+                  if (rollVariants.length === 1) pickVariant(rollVariants[0])
+                  else setMenuOpen(o => !o)
+                }}
+                disabled={!canRoll}
+                title={rollTitle}
+                aria-haspopup={rollVariants.length > 1 ? 'menu' : undefined}
+                aria-expanded={rollVariants.length > 1 ? menuOpen : undefined}
+                aria-label="Roll dice"
+              >
+                Roll
+                {rollVariants.length > 1 && <ChevronDown size={14} className="ic" />}
+              </button>
+              {menuOpen && rollVariants.length > 1 && (
+                <div className="dd" style={{ left: 0, right: 'auto' }} role="menu">
+                  {rollVariants.map(v => (
+                    <button
+                      key={v.id}
+                      className="dd-i"
+                      onClick={() => pickVariant(v)}
+                      role="menuitem"
+                    >
+                      <span>{v.name || '(unnamed)'}</span>
+                      <span className="dd-i-sub">
+                        {v.dice.map(d => `${d.type ? d.type + ' ' : ''}${diceExpr(d)}`).join(', ') || 'no dice'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button className="b bs" onClick={onRegen} disabled={blocked || !story.trim()} title="Regenerate" aria-label="Regenerate"><RefreshCw size={16} className="ic" /></button>
           <button className="b bs" onClick={onDelete} disabled={blocked || !story.trim()} title="Delete last" aria-label="Delete last turn"><Trash2 size={16} className="ic ic-danger-hover" /></button>
           {ttsBusy ? (
