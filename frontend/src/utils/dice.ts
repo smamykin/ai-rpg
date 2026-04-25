@@ -7,20 +7,6 @@ export interface RolledDie {
   invalid?: boolean
 }
 
-const DICE_RE = /^(\d+)d(\d+)$/
-
-// parseDice is the legacy "NdM" string parser, retained for migration only
-// (validateScenario / one-shot legacy data loaders). Live UI talks to the
-// numeric count/sides fields directly.
-export function parseDice(expr: string): { count: number; sides: number } | null {
-  const m = DICE_RE.exec((expr || '').trim())
-  if (!m) return null
-  const count = parseInt(m[1], 10)
-  const sides = parseInt(m[2], 10)
-  if (!count || !sides || count > 100 || sides > 1000) return null
-  return { count, sides }
-}
-
 // diceExpr renders a DiceSpec as the canonical "NdM" notation used in roll
 // text and the prompt's <task> block.
 export function diceExpr(spec: DiceSpec): string {

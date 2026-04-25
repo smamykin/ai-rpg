@@ -41,9 +41,6 @@ func NewRouter(cfg *Config) *chi.Mux {
 	if err != nil {
 		log.Fatalf("Failed to init scenario store: %v", err)
 	}
-	if err := storage.MigrateLegacyState(cfg.DataDir, sessions); err != nil {
-		log.Printf("warn: legacy migration: %v", err)
-	}
 
 	h := &Handlers{
 		cfg:       cfg,

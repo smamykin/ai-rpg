@@ -12,11 +12,33 @@ import (
 
 const HeaderSessionID = "X-Session-Id"
 
+// writeSchemaWipeRequired returns 426 with version metadata so the client can
+// show the wipe popup. Returns true if it handled the error.
+func writeSchemaWipeRequired(w http.ResponseWriter, err error) bool {
+	var se *game.SchemaWipeRequiredError
+	if !errors.As(err, &se) {
+		return false
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUpgradeRequired)
+	json.NewEncoder(w).Encode(map[string]any{
+		"error":        "schema_wipe_required",
+		"storedMajor":  se.StoredMajor,
+		"storedMinor":  se.StoredMinor,
+		"currentMajor": se.CurrentMajor,
+		"currentMinor": se.CurrentMinor,
+	})
+	return true
+}
+
 // loadCurrent loads the active session, or writes a 404 + returns nil.
 func (h *Handlers) loadCurrent(w http.ResponseWriter) *game.GameState {
 	st, err := h.sessions.LoadCurrent()
 	if errors.Is(err, storage.ErrNoCurrent) || errors.Is(err, storage.ErrNotFound) {
 		http.Error(w, "no current session", http.StatusNotFound)
+		return nil
+	}
+	if writeSchemaWipeRequired(w, err) {
 		return nil
 	}
 	if err != nil {
@@ -58,6 +80,9 @@ func (h *Handlers) PutState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	existing, err := h.sessions.Get(curID)
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -144,6 +169,9 @@ func (h *Handlers) ImportState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state, err := h.sessions.ImportJSON(data)
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

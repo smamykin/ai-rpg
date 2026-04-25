@@ -57,6 +57,9 @@ func (s *ScenarioStore) List() ([]*game.Scenario, error) {
 		id := strings.TrimSuffix(e.Name(), ".json")
 		sc, err := s.Get(id)
 		if err != nil {
+			if se := schemaErrAs(err); se != nil {
+				return nil, err
+			}
 			continue
 		}
 		out = append(out, sc)
@@ -77,6 +80,9 @@ func (s *ScenarioStore) Get(id string) (*game.Scenario, error) {
 	if err := json.Unmarshal(data, &sc); err != nil {
 		return nil, err
 	}
+	if err := game.MigrateScenario(&sc); err != nil {
+		return nil, err
+	}
 	if sc.Lore == nil {
 		sc.Lore = []game.LoreEntry{}
 	}
@@ -85,16 +91,6 @@ func (s *ScenarioStore) Get(id string) (*game.Scenario, error) {
 	}
 	if sc.RollVariants == nil {
 		sc.RollVariants = []game.RollVariant{}
-	}
-	changed := game.NormalizeLoreTags(sc.Lore)
-	if game.MigrateScenarioDiceRules(&sc) {
-		changed = true
-	}
-	if game.MigrateScenarioDice(&sc) {
-		changed = true
-	}
-	if changed {
-		_ = s.write(&sc)
 	}
 	return &sc, nil
 }
@@ -125,6 +121,8 @@ func (s *ScenarioStore) Create(in *game.Scenario) (*game.Scenario, error) {
 	now := time.Now().Unix()
 	sc.CreatedAt = now
 	sc.UpdatedAt = now
+	sc.SchemaMajor = game.CurrentSchemaMajor
+	sc.SchemaMinor = game.CurrentSchemaMinor
 	if err := s.write(&sc); err != nil {
 		return nil, err
 	}
@@ -139,6 +137,8 @@ func (s *ScenarioStore) Update(id string, in *game.Scenario) (*game.Scenario, er
 	in.ID = id
 	in.CreatedAt = existing.CreatedAt
 	in.UpdatedAt = time.Now().Unix()
+	in.SchemaMajor = game.CurrentSchemaMajor
+	in.SchemaMinor = game.CurrentSchemaMinor
 	if in.Lore == nil {
 		in.Lore = []game.LoreEntry{}
 	}

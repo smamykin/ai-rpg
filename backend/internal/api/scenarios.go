@@ -13,6 +13,9 @@ import (
 
 func (h *Handlers) ListScenarios(w http.ResponseWriter, r *http.Request) {
 	list, err := h.scenarios.List()
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -24,6 +27,9 @@ func (h *Handlers) ListScenarios(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetScenario(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sc, err := h.scenarios.Get(id)
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		if errors.Is(err, storage.ErrScenarioNotFound) {
 			http.Error(w, "not found", http.StatusNotFound)
@@ -59,6 +65,9 @@ func (h *Handlers) UpdateScenario(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := h.scenarios.Update(id, &sc)
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		if errors.Is(err, storage.ErrScenarioNotFound) {
 			http.Error(w, "not found", http.StatusNotFound)

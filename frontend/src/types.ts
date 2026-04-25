@@ -26,11 +26,6 @@ export interface LoreEntry {
 
 export const LORE_TAGS = ['world', 'location', 'faction', 'character', 'mechanic', 'quest', 'item', 'creature', 'other'] as const
 
-export function normalizeLoreTag(tag: string): string {
-  if (tag === 'rule') return 'mechanic'
-  return tag
-}
-
 export interface Section {
   id: string
   name: string
@@ -170,8 +165,12 @@ export interface GameState {
 
   tokenCaps?: TokenCaps
 
-  format?: string
+  schemaMajor: number
+  schemaMinor: number
 }
+
+export const CURRENT_SCHEMA_MAJOR = 1
+export const CURRENT_SCHEMA_MINOR = 0
 
 export interface SessionMeta {
   id: string
@@ -196,6 +195,8 @@ export interface Scenario {
   diceRules: string
   createdAt: number
   updatedAt: number
+  schemaMajor: number
+  schemaMinor: number
 }
 
 export function defaultScenario(): Scenario {
@@ -213,6 +214,8 @@ export function defaultScenario(): Scenario {
     diceRules: '',
     createdAt: 0,
     updatedAt: 0,
+    schemaMajor: CURRENT_SCHEMA_MAJOR,
+    schemaMinor: CURRENT_SCHEMA_MINOR,
   }
 }
 
@@ -234,7 +237,7 @@ export function validateScenario(obj: unknown): Scenario | null {
         id: asString(l.id) || uid('l'),
         name: asString(l.name),
         text: asString(l.text),
-        tag: normalizeLoreTag(asString(l.tag)) || 'other',
+        tag: asString(l.tag) || 'other',
         enabled: l.enabled !== false,
       }
     })
@@ -258,13 +261,8 @@ export function validateScenario(obj: unknown): Scenario | null {
       const dice = Array.isArray(v.dice)
         ? (v.dice as unknown[]).filter(d => d && typeof d === 'object').map(d => {
           const ds = d as Record<string, unknown>
-          // New shape: count + sides numbers. Legacy: a "NdM" dice string.
           let count = typeof ds.count === 'number' ? ds.count : 0
           let sides = typeof ds.sides === 'number' ? ds.sides : 0
-          if ((!count || !sides) && typeof ds.dice === 'string' && ds.dice) {
-            const m = /^(\d+)d(\d+)$/.exec(ds.dice.trim())
-            if (m) { count = parseInt(m[1], 10); sides = parseInt(m[2], 10) }
-          }
           if (!count || !sides) { count = 1; sides = 6 }
           return { count, sides, type: asString(ds.type) }
         })
@@ -277,16 +275,7 @@ export function validateScenario(obj: unknown): Scenario | null {
     })
     : []
 
-  // Prefer the new diceRules string. Fall back to migrating the legacy
-  // diceRulesLoreId pointer by copying the referenced lore entry's text.
-  let diceRules = asString(o.diceRules)
-  if (!diceRules.trim()) {
-    const legacyId = asString(o.diceRulesLoreId)
-    if (legacyId) {
-      const found = lore.find(l => l.id === legacyId)
-      if (found) diceRules = found.text.trim()
-    }
-  }
+  const diceRules = asString(o.diceRules)
 
   return {
     id: '',
@@ -302,6 +291,8 @@ export function validateScenario(obj: unknown): Scenario | null {
     diceRules,
     createdAt: 0,
     updatedAt: 0,
+    schemaMajor: CURRENT_SCHEMA_MAJOR,
+    schemaMinor: CURRENT_SCHEMA_MINOR,
   }
 }
 
@@ -457,7 +448,8 @@ export function defaultState(): GameState {
     viewingChapterId: chapterId,
     archivedChapters: [],
     effectiveCtxTokens: 32000,
-    format: 'ai-rpg-nano-v6',
+    schemaMajor: CURRENT_SCHEMA_MAJOR,
+    schemaMinor: CURRENT_SCHEMA_MINOR,
   }
 }
 

@@ -16,6 +16,29 @@ export class NoCurrentSessionError extends Error {
   constructor() { super('no current session'); this.name = 'NoCurrentSessionError' }
 }
 
+export class SchemaWipeRequiredError extends Error {
+  storedMajor: number
+  storedMinor: number
+  currentMajor: number
+  currentMinor: number
+  constructor(storedMajor: number, storedMinor: number, currentMajor: number, currentMinor: number) {
+    super(`schema wipe required: stored ${storedMajor}.${storedMinor}, current ${currentMajor}.${currentMinor}`)
+    this.name = 'SchemaWipeRequiredError'
+    this.storedMajor = storedMajor
+    this.storedMinor = storedMinor
+    this.currentMajor = currentMajor
+    this.currentMinor = currentMinor
+  }
+}
+
+// Global handler: any 426 response from the backend triggers it once before
+// the calling code's catch block runs, so the wipe popup shows even if the
+// caller swallows the error.
+let onSchemaWipeRequired: ((err: SchemaWipeRequiredError) => void) | null = null
+export function setSchemaWipeRequiredHandler(fn: ((err: SchemaWipeRequiredError) => void) | null) {
+  onSchemaWipeRequired = fn
+}
+
 async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts?.headers as Record<string, string> | undefined) }
   const method = (opts?.method || 'GET').toUpperCase()
@@ -23,6 +46,17 @@ async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
     headers['X-Session-Id'] = currentSessionId
   }
   const res = await fetch(BASE + url, { ...opts, headers })
+  if (res.status === 426) {
+    const body = await res.json().catch(() => ({}))
+    const err = new SchemaWipeRequiredError(
+      Number(body.storedMajor) || 0,
+      Number(body.storedMinor) || 0,
+      Number(body.currentMajor) || 0,
+      Number(body.currentMinor) || 0,
+    )
+    onSchemaWipeRequired?.(err)
+    throw err
+  }
   if (res.status === 409) throw new SessionMismatchError()
   if (res.status === 404 && url === '/state') throw new NoCurrentSessionError()
   if (!res.ok) {

@@ -13,6 +13,15 @@ import (
 	"ai-rpg-v2/internal/game"
 )
 
+// schemaErrAs returns the embedded SchemaWipeRequiredError if err is one.
+func schemaErrAs(err error) *game.SchemaWipeRequiredError {
+	var se *game.SchemaWipeRequiredError
+	if errors.As(err, &se) {
+		return se
+	}
+	return nil
+}
+
 const (
 	sessionsDir = "sessions"
 	currentFile = "current.json"
@@ -81,6 +90,9 @@ func (s *SessionStore) List() ([]SessionMeta, error) {
 		id := strings.TrimSuffix(e.Name(), ".json")
 		st, err := s.Get(id)
 		if err != nil {
+			if se := schemaErrAs(err); se != nil {
+				return nil, err
+			}
 			continue
 		}
 		metas = append(metas, metaFromState(st))
@@ -125,7 +137,10 @@ func (s *SessionStore) Get(id string) (*game.GameState, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("unmarshal session: %w", err)
 	}
-	if st.Migrate() {
+	if err := game.MigrateState(&st); err != nil {
+		return nil, err
+	}
+	if st.EnsureInvariants() {
 		_ = s.writeState(&st)
 	}
 	if st.SessionID == "" {
@@ -145,7 +160,10 @@ func (s *SessionStore) Save(id string, st *game.GameState) error {
 	if st.CreatedAt == 0 {
 		st.CreatedAt = st.LastPlayedAt
 	}
-	st.Migrate()
+	// Stamp current schema version on every save.
+	st.SchemaMajor = game.CurrentSchemaMajor
+	st.SchemaMinor = game.CurrentSchemaMinor
+	st.EnsureInvariants()
 	return s.writeState(st)
 }
 
@@ -178,7 +196,9 @@ func (s *SessionStore) Create(name string, seed *game.GameState) (*game.GameStat
 	now := time.Now().Unix()
 	st.CreatedAt = now
 	st.LastPlayedAt = now
-	st.Migrate()
+	st.SchemaMajor = game.CurrentSchemaMajor
+	st.SchemaMinor = game.CurrentSchemaMinor
+	st.EnsureInvariants()
 	if err := s.writeState(&st); err != nil {
 		return nil, err
 	}
@@ -303,6 +323,9 @@ func (s *SessionStore) ImportJSON(data []byte) (*game.GameState, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("unmarshal import: %w", err)
 	}
+	if err := game.MigrateState(&st); err != nil {
+		return nil, err
+	}
 	// Always assign a new id on import to avoid collision.
 	st.SessionID = newID()
 	now := time.Now().Unix()
@@ -310,7 +333,7 @@ func (s *SessionStore) ImportJSON(data []byte) (*game.GameState, error) {
 		st.CreatedAt = now
 	}
 	st.LastPlayedAt = now
-	st.Migrate()
+	st.EnsureInvariants()
 	if err := s.writeState(&st); err != nil {
 		return nil, err
 	}

@@ -32,6 +32,9 @@ type sessionsListResp struct {
 
 func (h *Handlers) ListSessions(w http.ResponseWriter, r *http.Request) {
 	metas, err := h.sessions.List()
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -56,6 +59,9 @@ func (h *Handlers) CreateSession(w http.ResponseWriter, r *http.Request) {
 	var seed *game.GameState
 	if strings.TrimSpace(req.ScenarioID) != "" {
 		s, err := h.scenarios.InstantiateSession(req.ScenarioID)
+		if writeSchemaWipeRequired(w, err) {
+			return
+		}
 		if err != nil {
 			if errors.Is(err, storage.ErrScenarioNotFound) {
 				http.Error(w, "scenario not found", http.StatusNotFound)
@@ -125,6 +131,9 @@ func (h *Handlers) SwitchSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, err := h.sessions.Get(req.ID)
+	if writeSchemaWipeRequired(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -114,6 +114,60 @@ export const THEMES: Theme[] = [
     },
   },
   {
+    id: 'linen',
+    name: 'Linen',
+    vars: {
+      '--bg': '#f5f3ef', '--sf': '#ebe8e2', '--sf2': '#ddd9d1', '--bd': '#b8b3a8',
+      '--tx': '#1f242c', '--mt': '#5e6878', '--ac': '#3d6da8', '--ac2': '#28507f', '--dng': '#b03020',
+      '--ic': '#1f242c', '--ic-hl': '#a86028',
+    },
+  },
+  {
+    id: 'sage',
+    name: 'Sage',
+    vars: {
+      '--bg': '#eaf0e4', '--sf': '#dde5d4', '--sf2': '#cdd8c0', '--bd': '#a8b89a',
+      '--tx': '#182218', '--mt': '#5c705c', '--ac': '#2d7a3e', '--ac2': '#1c5028', '--dng': '#b03020',
+      '--ic': '#182218', '--ic-hl': '#a04a18',
+    },
+  },
+  {
+    id: 'lavender',
+    name: 'Lavender',
+    vars: {
+      '--bg': '#efe8f4', '--sf': '#e3d8ec', '--sf2': '#d4c4e0', '--bd': '#b09cc4',
+      '--tx': '#2a1a3a', '--mt': '#6c5a80', '--ac': '#6e3fb5', '--ac2': '#4d2880', '--dng': '#b02860',
+      '--ic': '#2a1a3a', '--ic-hl': '#708818',
+    },
+  },
+  {
+    id: 'mist',
+    name: 'Mist',
+    vars: {
+      '--bg': '#e8eef2', '--sf': '#dae3ea', '--sf2': '#c8d4dd', '--bd': '#99adba',
+      '--tx': '#142028', '--mt': '#5a6e80', '--ac': '#2a8a8a', '--ac2': '#1c5e5e', '--dng': '#b03840',
+      '--ic': '#142028', '--ic-hl': '#b0682a',
+    },
+  },
+  {
+    id: 'rose',
+    name: 'Rose Quartz',
+    vars: {
+      '--bg': '#f4e8e6', '--sf': '#ecd9d6', '--sf2': '#e0c4c0', '--bd': '#c09a96',
+      '--tx': '#2c1614', '--mt': '#805e58', '--ac': '#b04858', '--ac2': '#802a3a', '--dng': '#a02018',
+      '--ic': '#2c1614', '--ic-hl': '#2c6b7a',
+    },
+  },
+  {
+    id: 'daylight',
+    name: 'Daylight',
+    vars: {
+      '--bg': '#f6f8fb', '--sf': '#ebeff5', '--sf2': '#dde4ed', '--bd': '#b0bccc',
+      '--tx': '#0f1a2c', '--mt': '#5a6a82', '--ac': '#2860d0', '--ac2': '#1842a0', '--dng': '#c83828',
+      '--ic': '#0f1a2c', '--ic-hl': '#c8902c',
+    },
+  },
+  {
     id: 'void',
     name: 'Void',
     vars: {

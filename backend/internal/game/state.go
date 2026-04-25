@@ -2,14 +2,40 @@ package game
 
 import (
 	"fmt"
-	"log"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
 
-const FormatV6 = "ai-rpg-nano-v6" // chapters + turns model
+// Schema versioning. Major bumps when stored data can't be migrated and the
+// user must wipe (the API surfaces this as 426 + a popup). Minor bumps when
+// in-place migration code can advance the data — register a func in
+// stateMigrations / scenarioMigrations indexed by source minor. Plain field
+// additions don't bump anything; EnsureInvariants fills defaults.
+const (
+	CurrentSchemaMajor = 1
+	CurrentSchemaMinor = 0
+)
+
+// SchemaWipeRequiredError signals that stored data is on a major version the
+// running code can't migrate. The handler turns this into HTTP 426.
+type SchemaWipeRequiredError struct {
+	StoredMajor  int
+	StoredMinor  int
+	CurrentMajor int
+	CurrentMinor int
+}
+
+func (e *SchemaWipeRequiredError) Error() string {
+	return fmt.Sprintf("schema wipe required: stored %d.%d, current %d.%d",
+		e.StoredMajor, e.StoredMinor, e.CurrentMajor, e.CurrentMinor)
+}
+
+// stateMigrations[i] migrates a GameState from minor version i to i+1.
+// Add entries when CurrentSchemaMinor is bumped.
+var stateMigrations = []func(*GameState){}
+
+// scenarioMigrations[i] migrates a Scenario from minor version i to i+1.
+var scenarioMigrations = []func(*Scenario){}
 
 // GameState holds the full game state.
 type GameState struct {
@@ -35,12 +61,8 @@ type GameState struct {
 	Notes             []Note        `json:"notes"`
 	RollVariants      []RollVariant `json:"rollVariants"`
 	DiceRules         string        `json:"diceRules,omitempty"`
-	// Deprecated: legacy field, replaced by DiceRules. Kept on the struct so
-	// pre-rework session JSON migrates on load (Migrate copies the referenced
-	// lore entry's text into DiceRules and clears this).
-	DiceRulesLoreID string      `json:"diceRulesLoreId,omitempty"`
-	AuFreq          int         `json:"auFreq"`
-	TTS             TTSSettings `json:"tts"`
+	AuFreq            int           `json:"auFreq"`
+	TTS               TTSSettings   `json:"tts"`
 
 	// Chapters (v6)
 	Chapters         []Chapter `json:"chapters"`
@@ -54,7 +76,9 @@ type GameState struct {
 	// Per-session token caps (overrides built-in defaults; nil = default).
 	TokenCaps *TokenCaps `json:"tokenCaps,omitempty"`
 
-	Format string `json:"format,omitempty"`
+	// Schema version of this stored state. See CurrentSchemaMajor/Minor.
+	SchemaMajor int `json:"schemaMajor"`
+	SchemaMinor int `json:"schemaMinor"`
 }
 
 type TTSSettings struct {
@@ -142,26 +166,6 @@ type LoreEntry struct {
 	Enabled bool   `json:"enabled"`
 }
 
-// NormalizeLoreTag renames legacy tags to the current set.
-func NormalizeLoreTag(tag string) string {
-	if tag == "rule" {
-		return "mechanic"
-	}
-	return tag
-}
-
-// NormalizeLoreTags rewrites legacy tags in place. Returns true if any entry changed.
-func NormalizeLoreTags(lore []LoreEntry) bool {
-	changed := false
-	for i := range lore {
-		if n := NormalizeLoreTag(lore[i].Tag); n != lore[i].Tag {
-			lore[i].Tag = n
-			changed = true
-		}
-	}
-	return changed
-}
-
 type Section struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -184,9 +188,6 @@ type DiceSpec struct {
 	Count int    `json:"count"`
 	Sides int    `json:"sides"`
 	Type  string `json:"type"`
-	// Deprecated: legacy "NdM" string from before count/sides were split out.
-	// Migrated on load and dropped from saves via omitempty.
-	Dice string `json:"dice,omitempty"`
 }
 
 // RollVariant is a named bundle of dice the player can invoke before an action.
@@ -211,63 +212,11 @@ type Scenario struct {
 	Secs         []Section     `json:"secs"`
 	RollVariants []RollVariant `json:"rollVariants"`
 	DiceRules    string        `json:"diceRules,omitempty"`
-	// Deprecated: legacy field, replaced by DiceRules. Migrated on load.
-	DiceRulesLoreID string `json:"diceRulesLoreId,omitempty"`
-	CreatedAt       int64  `json:"createdAt"`
-	UpdatedAt       int64  `json:"updatedAt"`
-}
+	CreatedAt    int64         `json:"createdAt"`
+	UpdatedAt    int64         `json:"updatedAt"`
 
-// MigrateScenarioDiceRules runs the same DiceRulesLoreID -> DiceRules migration
-// for a Scenario. Returns true if the scenario changed.
-func MigrateScenarioDiceRules(sc *Scenario) bool {
-	return migrateDiceRulesLoreID(&sc.DiceRulesLoreID, &sc.DiceRules, sc.Lore)
-}
-
-// MigrateScenarioDice walks the scenario's roll variants and migrates legacy
-// "NdM" Dice strings into Count/Sides. Returns true if any spec changed.
-func MigrateScenarioDice(sc *Scenario) bool {
-	return migrateRollVariantsDice(sc.RollVariants)
-}
-
-var diceLegacyRE = regexp.MustCompile(`^(\d+)d(\d+)$`)
-
-// migrateDiceSpec parses a legacy "NdM" Dice string into Count/Sides and clears
-// the legacy field. Falls back to {1, 6} when the string is unparseable but
-// non-empty so the variant stays usable. Returns true when it touched anything.
-func migrateDiceSpec(d *DiceSpec) bool {
-	if d.Dice == "" {
-		return false
-	}
-	if d.Count == 0 && d.Sides == 0 {
-		if m := diceLegacyRE.FindStringSubmatch(strings.TrimSpace(d.Dice)); m != nil {
-			c, _ := strconv.Atoi(m[1])
-			s, _ := strconv.Atoi(m[2])
-			if c > 0 && s > 0 {
-				d.Count = c
-				d.Sides = s
-			}
-		}
-		if d.Count == 0 || d.Sides == 0 {
-			d.Count = 1
-			d.Sides = 6
-		}
-	}
-	d.Dice = ""
-	return true
-}
-
-// migrateRollVariantsDice walks every die in every variant and runs
-// migrateDiceSpec. Returns true if any spec changed.
-func migrateRollVariantsDice(variants []RollVariant) bool {
-	changed := false
-	for i := range variants {
-		for j := range variants[i].Dice {
-			if migrateDiceSpec(&variants[i].Dice[j]) {
-				changed = true
-			}
-		}
-	}
-	return changed
+	SchemaMajor int `json:"schemaMajor"`
+	SchemaMinor int `json:"schemaMinor"`
 }
 
 // CombineActionAndRoll joins the player's typed action with the formatted roll
@@ -290,64 +239,65 @@ func CombineActionAndRoll(action, roll string) string {
 	return r
 }
 
-// migrateDiceRulesLoreID copies the referenced lore entry's text into the new
-// DiceRules string and clears the legacy pointer. Returns true if changed.
-func migrateDiceRulesLoreID(loreID *string, diceRules *string, lore []LoreEntry) bool {
-	if *loreID == "" || strings.TrimSpace(*diceRules) != "" {
-		// Nothing to migrate, but still drop a stale pointer so it doesn't linger.
-		if *loreID != "" {
-			*loreID = ""
-			return true
-		}
-		return false
+// MigrateState advances stored state to the current schema version. Returns
+// SchemaWipeRequiredError if the stored major doesn't match (or stored minor
+// is from a future version). Unversioned (zero-zero) data is treated as
+// freshly written at the current version.
+func MigrateState(s *GameState) error {
+	if s.SchemaMajor == 0 && s.SchemaMinor == 0 {
+		s.SchemaMajor = CurrentSchemaMajor
+		s.SchemaMinor = CurrentSchemaMinor
+		return nil
 	}
-	for _, l := range lore {
-		if l.ID == *loreID {
-			*diceRules = strings.TrimSpace(l.Text)
-			break
+	if s.SchemaMajor != CurrentSchemaMajor || s.SchemaMinor > CurrentSchemaMinor {
+		return &SchemaWipeRequiredError{
+			StoredMajor:  s.SchemaMajor,
+			StoredMinor:  s.SchemaMinor,
+			CurrentMajor: CurrentSchemaMajor,
+			CurrentMinor: CurrentSchemaMinor,
 		}
 	}
-	*loreID = ""
-	return true
+	for i := s.SchemaMinor; i < CurrentSchemaMinor; i++ {
+		stateMigrations[i](s)
+	}
+	s.SchemaMinor = CurrentSchemaMinor
+	return nil
 }
 
-// Migrate brings state to the current format. For any pre-V6 session, it wipes
-// play progress (chapters) while preserving session metadata and setup (lore,
-// overview, sections, TTS). An empty format (frontend PUT that didn't echo it)
-// is treated as current so play progress survives. Returns true if mutated.
-func (s *GameState) Migrate() bool {
+// MigrateScenario is the Scenario equivalent of MigrateState.
+func MigrateScenario(sc *Scenario) error {
+	if sc.SchemaMajor == 0 && sc.SchemaMinor == 0 {
+		sc.SchemaMajor = CurrentSchemaMajor
+		sc.SchemaMinor = CurrentSchemaMinor
+		return nil
+	}
+	if sc.SchemaMajor != CurrentSchemaMajor || sc.SchemaMinor > CurrentSchemaMinor {
+		return &SchemaWipeRequiredError{
+			StoredMajor:  sc.SchemaMajor,
+			StoredMinor:  sc.SchemaMinor,
+			CurrentMajor: CurrentSchemaMajor,
+			CurrentMinor: CurrentSchemaMinor,
+		}
+	}
+	for i := sc.SchemaMinor; i < CurrentSchemaMinor; i++ {
+		scenarioMigrations[i](sc)
+	}
+	sc.SchemaMinor = CurrentSchemaMinor
+	return nil
+}
+
+// EnsureInvariants initializes nil slices, defaults, and the active/viewing
+// chapter pointers so the rest of the code can rely on a fully-formed state.
+// Runs on every load/save/import. Returns true if anything was changed.
+func (s *GameState) EnsureInvariants() bool {
 	changed := false
 
-	if s.Format != "" && s.Format != FormatV6 {
-		// Known non-V6 format: wipe chapters so play starts clean. Setup is preserved.
-		s.Chapters = nil
-		s.ActiveChapterID = ""
-		s.ViewingChapterID = ""
-		s.ArchivedChapters = nil
-		log.Printf("migrated session %q from format %q to %q (play progress wiped, setup preserved)", s.SessionID, s.Format, FormatV6)
-		s.Format = FormatV6
-		changed = true
-	} else if s.Format == "" {
-		s.Format = FormatV6
-		changed = true
-	}
-
-	// Invariants
 	if s.Chapters == nil {
 		s.Chapters = []Chapter{}
 		changed = true
 	}
 	if s.Lore == nil {
 		s.Lore = []LoreEntry{}
-		changed = true
-	}
-	if NormalizeLoreTags(s.Lore) {
-		changed = true
-	}
-	if migrateDiceRulesLoreID(&s.DiceRulesLoreID, &s.DiceRules, s.Lore) {
-		changed = true
-	}
-	if migrateRollVariantsDice(s.RollVariants) {
 		changed = true
 	}
 	if s.Secs == nil {
@@ -422,7 +372,7 @@ func (s *GameState) ensureActiveChapter() bool {
 	return true
 }
 
-// ActiveChapter returns the active chapter, or nil if none (should not happen after Migrate).
+// ActiveChapter returns the active chapter, or nil if none (should not happen after EnsureInvariants).
 func (s *GameState) ActiveChapter() *Chapter {
 	for i := range s.Chapters {
 		if s.Chapters[i].ID == s.ActiveChapterID {
@@ -456,7 +406,8 @@ func DefaultState() *GameState {
 		RollVariants:       []RollVariant{},
 		Chapters:           []Chapter{},
 		EffectiveCtxTokens: 32000,
-		Format:             FormatV6,
+		SchemaMajor:        CurrentSchemaMajor,
+		SchemaMinor:        CurrentSchemaMinor,
 	}
 	s.ensureActiveChapter()
 	s.ViewingChapterID = s.ActiveChapterID
