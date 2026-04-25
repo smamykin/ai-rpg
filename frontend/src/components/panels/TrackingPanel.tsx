@@ -24,6 +24,7 @@ export default function TrackingPanel({
 }: Props) {
   const [nName, setNName] = useState('')
   const [nDesc, setNDesc] = useState('')
+  const [auDraft, setAuDraft] = useState<string | null>(null)
 
   return (
     <>
@@ -71,8 +72,27 @@ export default function TrackingPanel({
           <div style={{ borderTop: '1px solid var(--bd)', paddingTop: '.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem' }}>
               <label style={{ fontSize: '.82rem', color: 'var(--mt)', whiteSpace: 'nowrap' }}>Auto-update every</label>
-              <input type="number" className="ni" min={0} max={10} value={auFreq}
-                onChange={e => setField('auFreq', Math.max(0, Math.min(10, parseInt(e.target.value) || 0)))} />
+              <input
+                type="number"
+                inputMode="numeric"
+                className="ni"
+                min={0}
+                max={10}
+                value={auDraft !== null ? auDraft : auFreq}
+                onChange={e => setAuDraft(e.target.value)}
+                onBlur={() => {
+                  if (auDraft === null) return
+                  const n = parseInt(auDraft, 10)
+                  if (Number.isFinite(n)) {
+                    setField('auFreq', Math.max(0, Math.min(10, n)))
+                  }
+                  setAuDraft(null)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                  else if (e.key === 'Escape') { setAuDraft(null); (e.target as HTMLInputElement).blur() }
+                }}
+              />
               <span style={{ fontSize: '.82rem', color: 'var(--mt)' }}>gens</span>
             </div>
             <div style={{ fontSize: '.7rem', color: 'var(--mt)', marginBottom: '.5rem' }}>0 = manual only.</div>
