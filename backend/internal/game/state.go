@@ -32,9 +32,13 @@ type GameState struct {
 	Secs              []Section     `json:"secs"`
 	Notes             []Note        `json:"notes"`
 	RollVariants      []RollVariant `json:"rollVariants"`
-	DiceRulesLoreID   string        `json:"diceRulesLoreId,omitempty"`
-	AuFreq            int           `json:"auFreq"`
-	TTS               TTSSettings   `json:"tts"`
+	DiceRules         string        `json:"diceRules,omitempty"`
+	// Deprecated: legacy field, replaced by DiceRules. Kept on the struct so
+	// pre-rework session JSON migrates on load (Migrate copies the referenced
+	// lore entry's text into DiceRules and clears this).
+	DiceRulesLoreID string      `json:"diceRulesLoreId,omitempty"`
+	AuFreq          int         `json:"auFreq"`
+	TTS             TTSSettings `json:"tts"`
 
 	// Chapters (v6)
 	Chapters         []Chapter `json:"chapters"`
@@ -180,8 +184,8 @@ type DiceSpec struct {
 }
 
 // RollVariant is a named bundle of dice the player can invoke before an action.
-// The dice-rules lore entry is shared across all variants and stored on the
-// GameState / Scenario as DiceRulesLoreID.
+// The dice-resolution rules shared across every variant live on the GameState /
+// Scenario as the DiceRules string.
 type RollVariant struct {
 	ID   string     `json:"id"`
 	Name string     `json:"name"`
@@ -197,12 +201,61 @@ type Scenario struct {
 	CStyle       string        `json:"cStyle"`
 	Style        string        `json:"style"`
 	Diff         string        `json:"diff"`
-	Lore            []LoreEntry   `json:"lore"`
-	Secs            []Section     `json:"secs"`
-	RollVariants    []RollVariant `json:"rollVariants"`
-	DiceRulesLoreID string        `json:"diceRulesLoreId,omitempty"`
-	CreatedAt       int64         `json:"createdAt"`
-	UpdatedAt       int64         `json:"updatedAt"`
+	Lore         []LoreEntry   `json:"lore"`
+	Secs         []Section     `json:"secs"`
+	RollVariants []RollVariant `json:"rollVariants"`
+	DiceRules    string        `json:"diceRules,omitempty"`
+	// Deprecated: legacy field, replaced by DiceRules. Migrated on load.
+	DiceRulesLoreID string `json:"diceRulesLoreId,omitempty"`
+	CreatedAt       int64  `json:"createdAt"`
+	UpdatedAt       int64  `json:"updatedAt"`
+}
+
+// MigrateScenarioDiceRules runs the same DiceRulesLoreID -> DiceRules migration
+// for a Scenario. Returns true if the scenario changed.
+func MigrateScenarioDiceRules(sc *Scenario) bool {
+	return migrateDiceRulesLoreID(&sc.DiceRulesLoreID, &sc.DiceRules, sc.Lore)
+}
+
+// CombineActionAndRoll joins the player's typed action with the formatted roll
+// text for storage in a Turn. The current-turn prompt sends them separately;
+// this combined form is what later turns see in <story_so_far>.
+func CombineActionAndRoll(action, roll string) string {
+	a := strings.TrimSpace(action)
+	r := strings.TrimSpace(roll)
+	if a != "" && r != "" {
+		sep := ". "
+		switch a[len(a)-1] {
+		case '.', '!', '?':
+			sep = " "
+		}
+		return a + sep + r
+	}
+	if a != "" {
+		return a
+	}
+	return r
+}
+
+// migrateDiceRulesLoreID copies the referenced lore entry's text into the new
+// DiceRules string and clears the legacy pointer. Returns true if changed.
+func migrateDiceRulesLoreID(loreID *string, diceRules *string, lore []LoreEntry) bool {
+	if *loreID == "" || strings.TrimSpace(*diceRules) != "" {
+		// Nothing to migrate, but still drop a stale pointer so it doesn't linger.
+		if *loreID != "" {
+			*loreID = ""
+			return true
+		}
+		return false
+	}
+	for _, l := range lore {
+		if l.ID == *loreID {
+			*diceRules = strings.TrimSpace(l.Text)
+			break
+		}
+	}
+	*loreID = ""
+	return true
 }
 
 // Migrate brings state to the current format. For any pre-V6 session, it wipes
@@ -236,6 +289,9 @@ func (s *GameState) Migrate() bool {
 		changed = true
 	}
 	if NormalizeLoreTags(s.Lore) {
+		changed = true
+	}
+	if migrateDiceRulesLoreID(&s.DiceRulesLoreID, &s.DiceRules, s.Lore) {
 		changed = true
 	}
 	if s.Secs == nil {

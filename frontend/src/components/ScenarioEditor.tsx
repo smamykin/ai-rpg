@@ -311,11 +311,9 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
           <div style={{ width: '100%' }}>
             <RollVariantsEditor
               variants={sc.rollVariants || []}
-              lore={sc.lore}
-              diceRulesLoreId={sc.diceRulesLoreId || ''}
+              diceRules={sc.diceRules || ''}
               onChange={next => update('rollVariants', next)}
-              onSetRulesLore={id => update('diceRulesLoreId', id)}
-              onAddLore={entry => update('lore', [...sc.lore, entry])}
+              onDiceRulesChange={value => update('diceRules', value)}
             />
           </div>
         )}

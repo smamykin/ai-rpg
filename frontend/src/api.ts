@@ -286,7 +286,7 @@ export interface GenerateCallbacks {
 export function generate(
   task: string,
   action: string,
-  hasRolls: boolean,
+  roll: string,
   signal: AbortSignal,
   callbacks: GenerateCallbacks
 ): void {
@@ -295,7 +295,7 @@ export function generate(
   fetch(BASE + '/generate', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ task, action, hasRolls }),
+    body: JSON.stringify({ task, action, roll }),
     signal,
   })
     .then(async (res) => {

@@ -86,7 +86,11 @@ func (s *ScenarioStore) Get(id string) (*game.Scenario, error) {
 	if sc.RollVariants == nil {
 		sc.RollVariants = []game.RollVariant{}
 	}
-	if game.NormalizeLoreTags(sc.Lore) {
+	changed := game.NormalizeLoreTags(sc.Lore)
+	if game.MigrateScenarioDiceRules(&sc) {
+		changed = true
+	}
+	if changed {
 		_ = s.write(&sc)
 	}
 	return &sc, nil
@@ -190,5 +194,6 @@ func (s *ScenarioStore) InstantiateSession(scenarioID string) (*game.GameState, 
 	st.Lore = append([]game.LoreEntry{}, sc.Lore...)
 	st.Secs = append([]game.Section{}, sc.Secs...)
 	st.RollVariants = append([]game.RollVariant{}, sc.RollVariants...)
+	st.DiceRules = sc.DiceRules
 	return st, nil
 }

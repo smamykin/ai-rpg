@@ -11,9 +11,11 @@ import (
 )
 
 type GenerateRequest struct {
-	Task     string `json:"task"`   // "open", "action", "continue"
-	Action   string `json:"action"` // player's action text (for task="action")
-	HasRolls bool   `json:"hasRolls,omitempty"`
+	Task   string `json:"task"`   // "open", "action", "continue"
+	Action string `json:"action"` // player's action text (for task="action")
+	// Roll is the formatted dice text from this turn's variant (e.g.
+	// "[Combat] dice 1(2d6) resulted 9"). Empty when the player didn't roll.
+	Roll string `json:"roll,omitempty"`
 }
 
 type SummarizeRequest struct {
@@ -97,11 +99,16 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 
 	// For an action task, append the player's turn now so it's part of the prompt.
 	// Open/continue don't create a turn yet — the prompt reflects existing state.
-	if req.Task == "action" && req.Action != "" {
-		active.AppendTurn(req.Action, "")
+	// The stored action combines typed text and roll text so future turns see
+	// the full record in <story_so_far>; the current-turn prompt below still
+	// sends them separately for clean section formatting.
+	if req.Task == "action" {
+		if stored := game.CombineActionAndRoll(req.Action, req.Roll); stored != "" {
+			active.AppendTurn(stored, "")
+		}
 	}
 
-	prompt := game.BuildPrompt(state, req.Task, req.Action, req.HasRolls)
+	prompt := game.BuildPrompt(state, req.Task, req.Action, req.Roll)
 	effort := h.effortFor("story", state)
 	maxTokens := state.StoryCapForGen(state.Style, effort)
 
@@ -339,24 +346,27 @@ func (h *Handlers) PromptPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Task == "action" && strings.TrimSpace(req.Action) != "" {
-		// Clone chapters (and the active chapter's turns slice) so the hypothetical
-		// append doesn't leak into the stored state.
-		chapters := make([]game.Chapter, len(state.Chapters))
-		copy(chapters, state.Chapters)
-		state.Chapters = chapters
-		for i := range state.Chapters {
-			if state.Chapters[i].ID == state.ActiveChapterID {
-				turns := make([]game.Turn, len(state.Chapters[i].Turns))
-				copy(turns, state.Chapters[i].Turns)
-				state.Chapters[i].Turns = turns
-				state.Chapters[i].AppendTurn(req.Action, "")
-				break
+	if req.Task == "action" {
+		stored := game.CombineActionAndRoll(req.Action, req.Roll)
+		if stored != "" {
+			// Clone chapters (and the active chapter's turns slice) so the hypothetical
+			// append doesn't leak into the stored state.
+			chapters := make([]game.Chapter, len(state.Chapters))
+			copy(chapters, state.Chapters)
+			state.Chapters = chapters
+			for i := range state.Chapters {
+				if state.Chapters[i].ID == state.ActiveChapterID {
+					turns := make([]game.Turn, len(state.Chapters[i].Turns))
+					copy(turns, state.Chapters[i].Turns)
+					state.Chapters[i].Turns = turns
+					state.Chapters[i].AppendTurn(stored, "")
+					break
+				}
 			}
 		}
 	}
 
-	preview := game.BuildPromptPreview(state, req.Task, req.Action, req.HasRolls)
+	preview := game.BuildPromptPreview(state, req.Task, req.Action, req.Roll)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(preview)

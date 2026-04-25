@@ -17,7 +17,7 @@ interface Props {
   lore: LoreEntry[]
   notes: Note[]
   rollVariants: RollVariant[]
-  diceRulesLoreId: string
+  diceRules: string
   dispatch: React.Dispatch<any>
   galleryImages?: GalleryImage[]
   onGenerateImage?: (loreId: string) => void
@@ -33,7 +33,7 @@ interface Props {
 }
 
 export default function StoryPanel({
-  show, onClose, lore, notes, rollVariants, diceRulesLoreId, dispatch,
+  show, onClose, lore, notes, rollVariants, diceRules, dispatch,
   galleryImages = [], onGenerateImage,
   story = '', overview, summariesText = '',
   onSwitch,
@@ -115,11 +115,9 @@ export default function StoryPanel({
         ) : (
           <RollVariantsEditor
             variants={rollVariants}
-            lore={lore}
-            diceRulesLoreId={diceRulesLoreId}
+            diceRules={diceRules}
             onChange={next => dispatch({ type: 'SET_ROLL_VARIANTS', variants: next })}
-            onSetRulesLore={id => dispatch({ type: 'SET_FIELD', field: 'diceRulesLoreId', value: id })}
-            onAddLore={entry => dispatch({ type: 'ADD_LORE', entry })}
+            onDiceRulesChange={value => dispatch({ type: 'SET_FIELD', field: 'diceRules', value })}
           />
         )}
       </div>

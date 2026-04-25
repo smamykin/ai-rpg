@@ -154,7 +154,7 @@ export interface GameState {
   secs: Section[]
   notes: Note[]
   rollVariants: RollVariant[]
-  diceRulesLoreId?: string
+  diceRules: string
   auFreq: number
   tts: TTSSettings
 
@@ -192,7 +192,7 @@ export interface Scenario {
   lore: LoreEntry[]
   secs: Section[]
   rollVariants: RollVariant[]
-  diceRulesLoreId?: string
+  diceRules: string
   createdAt: number
   updatedAt: number
 }
@@ -209,7 +209,7 @@ export function defaultScenario(): Scenario {
     lore: [],
     secs: [],
     rollVariants: [],
-    diceRulesLoreId: '',
+    diceRules: '',
     createdAt: 0,
     updatedAt: 0,
   }
@@ -268,9 +268,16 @@ export function validateScenario(obj: unknown): Scenario | null {
     })
     : []
 
-  const loreIds = new Set(lore.map(l => l.id))
-  const diceRulesLoreIdRaw = asString(o.diceRulesLoreId)
-  const diceRulesLoreId = loreIds.has(diceRulesLoreIdRaw) ? diceRulesLoreIdRaw : ''
+  // Prefer the new diceRules string. Fall back to migrating the legacy
+  // diceRulesLoreId pointer by copying the referenced lore entry's text.
+  let diceRules = asString(o.diceRules)
+  if (!diceRules.trim()) {
+    const legacyId = asString(o.diceRulesLoreId)
+    if (legacyId) {
+      const found = lore.find(l => l.id === legacyId)
+      if (found) diceRules = found.text.trim()
+    }
+  }
 
   return {
     id: '',
@@ -283,7 +290,7 @@ export function validateScenario(obj: unknown): Scenario | null {
     lore,
     secs,
     rollVariants,
-    diceRulesLoreId,
+    diceRules,
     createdAt: 0,
     updatedAt: 0,
   }
@@ -411,7 +418,7 @@ export function defaultState(): GameState {
     secs: [],
     notes: [],
     rollVariants: [],
-    diceRulesLoreId: '',
+    diceRules: '',
     auFreq: 0,
     tts: { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
     chapters: [{

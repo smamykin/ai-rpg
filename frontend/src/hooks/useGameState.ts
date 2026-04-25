@@ -2,6 +2,7 @@ import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
 import type { Chapter, GameState, LoreEntry, Note, RollVariant, Section, Phase, TTSModelSettings, Turn } from '../types'
 import { defaultState, getActiveChapter, getViewingChapter, newChapterId, newTurnId, renderChapterContent, wordCount } from '../types'
 import { expandShortcut } from '../utils/shortcuts'
+import { combineActionAndRoll } from '../utils/dice'
 import * as api from '../api'
 
 interface State extends GameState {
@@ -147,7 +148,7 @@ function reducer(state: State, action: Action): State {
         archivedChapters,
         notes: loaded.notes || [],
         rollVariants: loaded.rollVariants || [],
-        diceRulesLoreId: loaded.diceRulesLoreId || '',
+        diceRules: loaded.diceRules || '',
         tts: loaded.tts || { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
         phase: hasPlayContent ? 'playing' : 'setup',
         loaded: true,
@@ -240,13 +241,13 @@ function toRoman(n: number): string {
 function toPersistable(s: State): Partial<GameState> {
   const {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
-    lore, secs, notes, rollVariants, diceRulesLoreId, auFreq, tts,
+    lore, secs, notes, rollVariants, diceRules, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
     effectiveCtxTokens, tokenCaps, format,
   } = s
   return {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
-    lore, secs, notes, rollVariants, diceRulesLoreId, auFreq, tts,
+    lore, secs, notes, rollVariants, diceRules, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
     effectiveCtxTokens, tokenCaps, format,
   }
@@ -316,7 +317,7 @@ export function useGameState() {
     return () => clearTimeout(saveTimer.current)
   }, [
     state.name, state.overview, state.style, state.cStyle, state.storyModel, state.supportModel,
-    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.notes, state.rollVariants, state.diceRulesLoreId, state.auFreq, state.tts,
+    state.modelRoles, state.arc, state.diff, state.lore, state.secs, state.notes, state.rollVariants, state.diceRules, state.auFreq, state.tts,
     state.chapters, state.activeChapterId, state.viewingChapterId, state.archivedChapters,
     state.effectiveCtxTokens, state.loaded, state.phase, state.sessionId,
   ])
@@ -333,7 +334,10 @@ export function useGameState() {
   // Generate appends a new turn (or fills the pending one) on the active chapter.
   // Always operates on the active chapter regardless of what the user is viewing.
   // UI should block calls when not viewing active.
-  const generate = useCallback((task: string, actionText?: string, baseTurns?: Turn[], hasRolls?: boolean) => {
+  // actionText/roll are sent to the backend separately so the prompt can format
+  // them in distinct lines (Player's action / Player rolled). The Turn stores
+  // a combined form so it shows up cleanly in story-so-far on later turns.
+  const generate = useCallback((task: string, actionText?: string, baseTurns?: Turn[], roll?: string) => {
     const cur = stateRef.current
     const active = getActiveChapter(cur)
     if (!active) return
@@ -346,11 +350,12 @@ export function useGameState() {
 
     const priorTurns = baseTurns ?? active.turns ?? []
     // The "pending" turn is where streaming text lands. For an action we create a
-    // fresh turn with the player's action; for open/continue it has no action.
+    // fresh turn with the player's action+roll; for open/continue it has no action.
+    const storedAction = combineActionAndRoll(actionText || '', roll || '')
     const pendingId = newTurnId()
     const pending: Turn = {
       id: pendingId,
-      action: task === 'action' && actionText ? actionText : undefined,
+      action: task === 'action' && storedAction ? storedAction : undefined,
       response: '',
       createdAt: Math.floor(Date.now() / 1000),
     }
@@ -363,7 +368,7 @@ export function useGameState() {
     // Save latest state so the backend sees the new action before generating.
     // Strip the empty pending turn (which has no response yet) — the backend will
     // recreate its own action turn for task='action' inside Generate.
-    const optimisticTurns = task === 'action' && actionText ? priorTurns : priorTurns
+    const optimisticTurns = task === 'action' && storedAction ? priorTurns : priorTurns
     const optimistic: State = {
       ...cur,
       chapters: cur.chapters.map(c => c.id === active.id ? { ...c, turns: optimisticTurns } : c),
@@ -371,7 +376,7 @@ export function useGameState() {
     const savePromise = api.saveState(toPersistable(optimistic)).catch(() => {})
 
     savePromise.then(() => {
-      api.generate(task, actionText || '', !!hasRolls, ctrl.signal, {
+      api.generate(task, actionText || '', roll || '', ctrl.signal, {
         onChunk: (text) => {
           dispatch({ type: 'SET_GEN_STAGE', stage: 'writing' })
           dispatch({ type: 'SET_STREAMING', text })
@@ -433,9 +438,12 @@ export function useGameState() {
     generate('open')
   }, [generate])
 
-  const submit = useCallback((action: string, hasRolls?: boolean) => {
-    if (!action.trim() || state.gen || state.summing || !isViewingActive) return
-    generate('action', expandShortcut(action.trim()), undefined, hasRolls)
+  const submit = useCallback((action: string, roll?: string) => {
+    if (state.gen || state.summing || !isViewingActive) return
+    const trimmedAction = action.trim()
+    const trimmedRoll = (roll || '').trim()
+    if (!trimmedAction && !trimmedRoll) return
+    generate('action', expandShortcut(trimmedAction), undefined, trimmedRoll)
   }, [generate, state.gen, state.summing, isViewingActive])
 
   const cont = useCallback(() => {

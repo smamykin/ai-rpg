@@ -53,7 +53,7 @@ interface Props {
     secs: GameState['secs']
     notes: GameState['notes']
     rollVariants: GameState['rollVariants']
-    diceRulesLoreId?: string
+    diceRules: string
     auFreq: number
     tts: TTSSettings
     lastNarrationId: number
@@ -66,7 +66,7 @@ interface Props {
   dispatch: React.Dispatch<any>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   actions: {
-    submit: (action: string, hasRolls?: boolean) => void
+    submit: (action: string, roll?: string) => void
     cont: () => void
     regen: () => void
     deleteLast: () => void
@@ -436,7 +436,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         lore={state.lore}
         notes={state.notes || []}
         rollVariants={state.rollVariants || []}
-        diceRulesLoreId={state.diceRulesLoreId || ''}
+        diceRules={state.diceRules || ''}
         dispatch={dispatch}
         galleryImages={gallery.images}
         onGenerateImage={(loreId) => openGenModal('lore', loreId)}

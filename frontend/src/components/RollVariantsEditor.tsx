@@ -1,27 +1,23 @@
 import { X, Plus } from 'lucide-react'
-import type { LoreEntry, RollVariant, DiceSpec } from '../types'
+import type { RollVariant, DiceSpec } from '../types'
 import { uid } from '../types'
 import { parseDice } from '../utils/dice'
+import ModalTextField from './ModalTextField'
 
 interface Props {
   variants: RollVariant[]
-  lore: LoreEntry[]
-  diceRulesLoreId: string
+  diceRules: string
   onChange: (next: RollVariant[]) => void
-  onSetRulesLore: (loreId: string) => void
-  onAddLore?: (entry: LoreEntry) => void
+  onDiceRulesChange: (next: string) => void
 }
 
-const EXAMPLE_LORE_NAME = 'Dice Rules'
-const EXAMPLE_LORE_TEXT = 'Roll the dice and sum the results. 2 = success, 1 = miss. On success, the player gets their way; on a miss, something goes wrong — narrate a light complication.'
+const EXAMPLE_RULES_TEXT = 'Roll the dice and sum the results. 2 = success, 1 = miss. On success, the player gets their way; on a miss, something goes wrong — narrate a light complication.'
 
 function newVariant(): RollVariant {
   return { id: uid('rv'), name: '', dice: [{ dice: '1d6', type: '' }] }
 }
 
-export default function RollVariantsEditor({ variants, lore, diceRulesLoreId, onChange, onSetRulesLore, onAddLore }: Props) {
-  const rulesOk = !!diceRulesLoreId && lore.some(l => l.id === diceRulesLoreId)
-
+export default function RollVariantsEditor({ variants, diceRules, onChange, onDiceRulesChange }: Props) {
   const updateVariant = (id: string, patch: Partial<RollVariant>) => {
     onChange(variants.map(v => v.id === id ? { ...v, ...patch } : v))
   }
@@ -53,19 +49,7 @@ export default function RollVariantsEditor({ variants, lore, diceRulesLoreId, on
   }
 
   const addExample = () => {
-    let exampleLore = lore.find(l => l.name === EXAMPLE_LORE_NAME)
-    if (!exampleLore && onAddLore) {
-      exampleLore = {
-        id: uid('l'),
-        name: EXAMPLE_LORE_NAME,
-        text: EXAMPLE_LORE_TEXT,
-        tag: 'mechanic',
-        enabled: true,
-      }
-      onAddLore(exampleLore)
-    }
-    if (!exampleLore) return
-    if (!diceRulesLoreId) onSetRulesLore(exampleLore.id)
+    if (!diceRules.trim()) onDiceRulesChange(EXAMPLE_RULES_TEXT)
     onChange([...variants, {
       id: uid('rv'),
       name: 'Coin flip',
@@ -76,29 +60,23 @@ export default function RollVariantsEditor({ variants, lore, diceRulesLoreId, on
   return (
     <div style={{ width: '100%' }}>
       <div className="gr">
-        <label className="lb">Rules lore (shared by every variant)</label>
-        <select
-          value={diceRulesLoreId}
-          onChange={e => onSetRulesLore(e.target.value)}
-          style={{ width: '100%', fontSize: '.85rem', padding: '.4rem .5rem' }}
-        >
-          <option value="">— Select a lore entry —</option>
-          {lore.map(l => (
-            <option key={l.id} value={l.id}>{l.name || '(unnamed)'}</option>
-          ))}
-        </select>
+        <label className="lb">Dice rules (shared by every variant)</label>
+        <ModalTextField
+          className="mt"
+          value={diceRules}
+          onChange={onDiceRulesChange}
+          placeholder="How dice resolve. e.g. roll the dice, sum the results, 2 = success, 1 = miss..."
+          lines={3}
+          title="Dice rules"
+        />
         <div className="hint">
-          {rulesOk
-            ? 'This lore is hoisted into <dice_rules> whenever a variant is rolled, and excluded from general lore the rest of the time.'
-            : lore.length === 0
-              ? 'Add a lore entry first, then pick it here.'
-              : 'Pick the lore entry that describes how your dice resolve.'}
+          Hoisted into <code>&lt;dice_rules&gt;</code> whenever the player rolls a variant. Hidden from the prompt the rest of the time.
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.6rem', flexWrap: 'wrap' }}>
         <button className="b bs ba" onClick={addVariant}><Plus size={14} className="ic" /> New variant</button>
-        <button className="b bs" onClick={addExample} title="Append an example variant (and sample rule lore if missing)">Add example</button>
+        <button className="b bs" onClick={addExample} title="Append an example variant (and sample rules text if missing)">Add example</button>
       </div>
 
       {variants.length === 0 && (

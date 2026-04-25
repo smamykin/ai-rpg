@@ -62,24 +62,16 @@ func estimateTokens(s string) int {
 
 // buildSections returns the ordered labeled sections that make up the user prompt.
 // BuildPrompt and BuildPromptPreview both call this so the two cannot drift.
-// hasRolls signals that the player invoked one or more roll variants this turn,
-// which causes the shared DiceRulesLoreID lore entry to be hoisted into a
-// <dice_rules> block right before <task>.
-func buildSections(state *GameState, task, action string, hasRolls bool) []PromptSection {
+// roll, when non-empty, is the formatted dice text from this turn's variant
+// (e.g. "[Combat] dice 1(2d6) resulted 9"). It causes DiceRules to be hoisted
+// into <dice_rules> and adds a "Player rolled ..." line to the action task.
+func buildSections(state *GameState, task, action, roll string) []PromptSection {
 	out := []PromptSection{}
-
-	// The shared dice-rules lore is excluded from general <lore> so rules don't
-	// clutter non-roll turns, and re-introduced in <dice_rules> only when a roll
-	// is in play.
-	rulesLoreID := state.DiceRulesLoreID
 
 	// Lore
 	var lb strings.Builder
 	var enabledLore []LoreEntry
 	for _, l := range state.Lore {
-		if rulesLoreID != "" && l.ID == rulesLoreID {
-			continue
-		}
 		if l.Enabled && strings.TrimSpace(l.Text) != "" {
 			enabledLore = append(enabledLore, l)
 		}
@@ -87,7 +79,7 @@ func buildSections(state *GameState, task, action string, hasRolls bool) []Promp
 	if len(enabledLore) > 0 {
 		lb.WriteString("<lore>\n")
 		for _, l := range enabledLore {
-			fmt.Fprintf(&lb, "**%s**: %s\n\n", l.Name, strings.TrimSpace(l.Text))
+			fmt.Fprintf(&lb, "**%s**\n\n%s\n\n", l.Name, strings.TrimSpace(l.Text))
 		}
 		lb.WriteString("</lore>\n\n")
 		out = append(out, PromptSection{Label: "Lore", Text: lb.String()})
@@ -140,17 +132,12 @@ func buildSections(state *GameState, task, action string, hasRolls bool) []Promp
 	}
 
 	// Dice rules — hoisted when the player rolled any variant this turn.
-	if hasRolls && rulesLoreID != "" {
-		for _, l := range state.Lore {
-			if l.ID != rulesLoreID {
-				continue
-			}
-			if strings.TrimSpace(l.Text) == "" {
-				break
-			}
-			text := fmt.Sprintf("<dice_rules>\n**%s**: %s\n</dice_rules>\n\n", l.Name, strings.TrimSpace(l.Text))
-			out = append(out, PromptSection{Label: "Dice rules", Text: text})
-			break
+	if strings.TrimSpace(roll) != "" {
+		if rules := strings.TrimSpace(state.DiceRules); rules != "" {
+			out = append(out, PromptSection{
+				Label: "Dice rules",
+				Text:  fmt.Sprintf("<dice_rules>\n%s\n</dice_rules>\n\n", rules),
+			})
 		}
 	}
 
@@ -164,7 +151,16 @@ func buildSections(state *GameState, task, action string, hasRolls bool) []Promp
 	case "open":
 		taskText = fmt.Sprintf("<task>\nWrite the opening paragraph based on the <overview> above. One paragraph only — just the START. Specific situation, maybe NPC dialogue. Avoid grandiose phrasing.%s\n</task>", styleSuffix)
 	case "action":
-		taskText = fmt.Sprintf("<task>\nPlayer's action: \"%s\"\nWrite direct consequences. Include NPC dialogue if relevant. Do NOT make choices for the player.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s\n</task>", action, state.Style, styleSuffix)
+		var b strings.Builder
+		b.WriteString("<task>\n")
+		if strings.TrimSpace(action) != "" {
+			fmt.Fprintf(&b, "Player's action: \"%s\"\n", action)
+		}
+		if r := strings.TrimSpace(roll); r != "" {
+			fmt.Fprintf(&b, "Player rolled %s\n", r)
+		}
+		fmt.Fprintf(&b, "Write direct consequences. Include NPC dialogue if relevant. Do NOT make choices for the player.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s\n</task>", state.Style, styleSuffix)
+		taskText = b.String()
 	default: // "continue"
 		taskText = fmt.Sprintf("<task>\nContinue the story naturally. Include dialogue when relevant.\nRESPONSE LENGTH: %s. Do NOT exceed this.%s\n</task>", state.Style, styleSuffix)
 	}
@@ -178,9 +174,9 @@ func buildSections(state *GameState, task, action string, hasRolls bool) []Promp
 }
 
 // BuildPrompt assembles the full user prompt from all game context.
-func BuildPrompt(state *GameState, task, action string, hasRolls bool) string {
+func BuildPrompt(state *GameState, task, action, roll string) string {
 	var b strings.Builder
-	for _, s := range buildSections(state, task, action, hasRolls) {
+	for _, s := range buildSections(state, task, action, roll) {
 		b.WriteString(s.Text)
 	}
 	return b.String()
@@ -189,8 +185,8 @@ func BuildPrompt(state *GameState, task, action string, hasRolls bool) string {
 // BuildPromptPreview returns the prompt in labeled sections with token estimates.
 // The system prompt is reported separately; the "response" field reflects the
 // reserved headroom for the model's reply.
-func BuildPromptPreview(state *GameState, task, action string, hasRolls bool) PromptPreview {
-	sections := buildSections(state, task, action, hasRolls)
+func BuildPromptPreview(state *GameState, task, action, roll string) PromptPreview {
+	sections := buildSections(state, task, action, roll)
 
 	var ub strings.Builder
 	for _, s := range sections {

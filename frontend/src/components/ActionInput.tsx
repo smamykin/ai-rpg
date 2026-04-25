@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, Brain, ChevronDown } from 'lucide-react'
 import type { RollVariant } from '../types'
 import { rollVariant as rollVariantDice, formatRolled } from '../utils/dice'
@@ -8,7 +8,7 @@ interface Props {
   busy?: boolean // gen || summing — disables interactive controls without swapping Submit→Stop
   story: string
   rollVariants: RollVariant[]
-  onSubmit: (action: string, hasRolls?: boolean) => void
+  onSubmit: (action: string, roll?: string) => void
   onContinue: () => void
   onRegen: () => void
   onDelete: () => void
@@ -37,24 +37,13 @@ export default function ActionInput({
 }: Props) {
   const [action, setAction] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const hasRollsRef = useRef(false)
-  const diceCountRef = useRef(0)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
   const blocked = busy ?? gen
-
-  const resetRolls = () => {
-    hasRollsRef.current = false
-    diceCountRef.current = 0
-  }
 
   const handleSubmit = useCallback(() => {
     if (!action.trim() || blocked) return
-    const had = hasRollsRef.current
-    onSubmit(action.trim(), had)
+    onSubmit(action.trim())
     setAction('')
-    resetRolls()
   }, [action, blocked, onSubmit])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -68,19 +57,18 @@ export default function ActionInput({
     el.style.height = Math.min(el.scrollHeight, 110) + 'px'
   }
 
+  // Picking a variant rolls the dice and submits immediately. The roll text
+  // (always carrying the variant name as a [bracket] label) is sent separately
+  // from the typed action so the prompt builder can format them on distinct
+  // lines. The textarea clears so shortcut state stays consistent.
   const pickVariant = (v: RollVariant) => {
+    if (blocked) return
     const rolled = rollVariantDice(v)
-    const text = formatRolled(rolled, diceCountRef.current + 1)
-    diceCountRef.current += rolled.length
-    hasRollsRef.current = true
-    setAction(prev => {
-      const trimmed = prev.trimEnd()
-      if (!trimmed) return text
-      const sep = /[.!?]$/.test(trimmed) ? ' ' : '. '
-      return trimmed + sep + text
-    })
+    const rollText = formatRolled(rolled, 1, v.name)
+    const typed = action.trim()
     setMenuOpen(false)
-    setQuery('')
+    setAction('')
+    onSubmit(typed, rollText)
   }
 
   useEffect(() => {
@@ -88,41 +76,16 @@ export default function ActionInput({
     const onDocClick = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setMenuOpen(false)
-        setQuery('')
       }
     }
     document.addEventListener('mousedown', onDocClick)
-    // Focus the search input when the menu opens
-    const t = setTimeout(() => searchRef.current?.focus(), 0)
-    return () => {
-      document.removeEventListener('mousedown', onDocClick)
-      clearTimeout(t)
-    }
+    return () => document.removeEventListener('mousedown', onDocClick)
   }, [menuOpen])
-
-  const filteredVariants = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return rollVariants
-    return rollVariants.filter(v => {
-      if (v.name.toLowerCase().includes(q)) return true
-      return v.dice.some(d =>
-        d.dice.toLowerCase().includes(q) || (d.type || '').toLowerCase().includes(q),
-      )
-    })
-  }, [rollVariants, query])
-
-  const handleMenuKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') { e.preventDefault(); setMenuOpen(false); setQuery('') }
-    if (e.key === 'Enter' && filteredVariants.length > 0) {
-      e.preventDefault()
-      pickVariant(filteredVariants[0])
-    }
-  }
 
   const canRoll = !blocked && rollVariants.length > 0
   const rollTitle = rollVariants.length === 0
     ? 'Define a roll variant in Story → Rolls first'
-    : 'Roll a variant (appends to action)'
+    : 'Roll a variant (submits immediately)'
 
   const renderMainButton = () => {
     if (gen) return <button className="b bs" onClick={onStop} style={{ minHeight: 40 }} aria-label="Stop generation"><Square size={18} className="ic ic-danger" fill="currentColor" /></button>
@@ -180,20 +143,11 @@ export default function ActionInput({
             )}
             {menuOpen && (
               <div className="dd" role="menu">
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  onKeyDown={handleMenuKey}
-                  placeholder="Search variants..."
-                  style={{ fontSize: '.82rem', padding: '.35rem .5rem', marginBottom: '.25rem' }}
-                />
-                {filteredVariants.length === 0 ? (
+                {rollVariants.length === 0 ? (
                   <div style={{ padding: '.4rem .55rem', fontSize: '.8rem', color: 'var(--mt)' }}>
-                    No matches.
+                    No variants.
                   </div>
-                ) : filteredVariants.map(v => (
+                ) : rollVariants.map(v => (
                   <button
                     key={v.id}
                     className="dd-i"

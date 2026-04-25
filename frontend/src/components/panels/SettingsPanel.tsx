@@ -195,46 +195,46 @@ export default function SettingsPanel({
               </div>
             )
           })}
+        </details>
 
-          <details className="adv" style={{ marginTop: '.6rem' }}>
-            <summary>Token caps</summary>
-            <div className="hint" style={{ marginBottom: '.5rem' }}>
-              Per-task <code>max_tokens</code> caps. Empty input = no cap. Reasoning tokens count as output tokens, so when thinking is on the bonus is added on top.
+        <details className="adv">
+          <summary>Token caps</summary>
+          <div className="hint" style={{ marginBottom: '.5rem' }}>
+            Per-task <code>max_tokens</code> caps. Empty input = no cap. Reasoning tokens count as output tokens, so when thinking is on the bonus is added on top.
+          </div>
+          {TOKEN_CAP_GROUPS.map(group => (
+            <div key={group.name} style={{ marginBottom: '.5rem' }}>
+              <label className="lb" style={{ marginBottom: '.3rem' }}>{group.name}</label>
+              {group.fields.map(f => {
+                const stored = tokenCaps?.[f.key]
+                const def = TOKEN_CAP_DEFAULTS[f.key]
+                return (
+                  <div key={f.key} className="gr" style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                    <label className="lb" style={{ flex: 1, marginBottom: 0 }}>{f.label}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={50}
+                      placeholder={`default ${def}`}
+                      value={stored === undefined ? '' : stored}
+                      onChange={e => {
+                        const raw = e.target.value
+                        const next: TokenCaps = { ...(tokenCaps || {}) }
+                        if (raw === '') delete next[f.key]
+                        else {
+                          const n = Number(raw)
+                          if (Number.isFinite(n) && n >= 0) next[f.key] = Math.floor(n)
+                        }
+                        setField('tokenCaps', next)
+                      }}
+                      style={{ width: '110px' }}
+                    />
+                    {f.hint && <div className="hint" style={{ flexBasis: '100%', margin: 0 }}>{f.hint}</div>}
+                  </div>
+                )
+              })}
             </div>
-            {TOKEN_CAP_GROUPS.map(group => (
-              <div key={group.name} style={{ marginBottom: '.5rem' }}>
-                <label className="lb" style={{ marginBottom: '.3rem' }}>{group.name}</label>
-                {group.fields.map(f => {
-                  const stored = tokenCaps?.[f.key]
-                  const def = TOKEN_CAP_DEFAULTS[f.key]
-                  return (
-                    <div key={f.key} className="gr" style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                      <label className="lb" style={{ flex: 1, marginBottom: 0 }}>{f.label}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        step={50}
-                        placeholder={`default ${def}`}
-                        value={stored === undefined ? '' : stored}
-                        onChange={e => {
-                          const raw = e.target.value
-                          const next: TokenCaps = { ...(tokenCaps || {}) }
-                          if (raw === '') delete next[f.key]
-                          else {
-                            const n = Number(raw)
-                            if (Number.isFinite(n) && n >= 0) next[f.key] = Math.floor(n)
-                          }
-                          setField('tokenCaps', next)
-                        }}
-                        style={{ width: '110px' }}
-                      />
-                      {f.hint && <div className="hint" style={{ flexBasis: '100%', margin: 0 }}>{f.hint}</div>}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </details>
+          ))}
         </details>
 
         <div className="gr">
