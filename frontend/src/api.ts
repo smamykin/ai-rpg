@@ -168,12 +168,11 @@ export async function generateImages(
   model: string,
   prompt: string,
   n: number,
-  width: number,
-  height: number
+  resolution: string
 ): Promise<{ url: string }[]> {
   const res = await fetchJSON<{ images: { url: string }[] }>('/images/generate', {
     method: 'POST',
-    body: JSON.stringify({ model, prompt, n, width, height }),
+    body: JSON.stringify({ model, prompt, n, resolution }),
   })
   return res.images
 }

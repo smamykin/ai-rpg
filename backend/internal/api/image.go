@@ -8,11 +8,10 @@ import (
 )
 
 type GenerateImageRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	N      int    `json:"n"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+	Model      string `json:"model"`
+	Prompt     string `json:"prompt"`
+	N          int    `json:"n"`
+	Resolution string `json:"resolution"`
 }
 
 type EnhancePromptRequest struct {
@@ -59,14 +58,11 @@ func (h *Handlers) GenerateImages(w http.ResponseWriter, r *http.Request) {
 	if req.N < 1 {
 		req.N = 1
 	}
-	if req.Width < 1 {
-		req.Width = 1024
-	}
-	if req.Height < 1 {
-		req.Height = 1024
+	if strings.TrimSpace(req.Resolution) == "" {
+		req.Resolution = "1024x1024"
 	}
 
-	results, err := h.client.GenerateImage(r.Context(), req.Model, req.Prompt, req.N, req.Width, req.Height)
+	results, err := h.client.GenerateImage(r.Context(), req.Model, req.Prompt, req.N, req.Resolution)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

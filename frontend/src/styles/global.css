@@ -455,6 +455,9 @@ select {
 .gm-dd-opt { padding: .45rem .6rem; font-size: .78rem; cursor: pointer; color: var(--mt); border-bottom: 1px solid rgba(46,41,34,.5); }
 .gm-dd-opt:hover { background: rgba(212,168,67,.1); color: var(--tx); }
 .gm-dd-opt.sel { color: var(--ac); font-weight: 500; }
+.gm-mi { margin-top: .35rem; font-size: .76rem; line-height: 1.35; }
+.gm-mi-d { color: var(--mt); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: help; }
+.gm-mi-c { color: var(--ac); margin-top: .15rem; }
 
 /* Gallery grid */
 .gl { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: .4rem; }

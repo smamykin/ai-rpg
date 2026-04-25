@@ -338,6 +338,10 @@ export interface ModelInfo {
 export interface ImageModelInfo {
   id: string
   name: string
+  description?: string
+  pricing?: Record<string, number>
+  supportedResolutions?: string[]
+  maxImages?: number
 }
 
 export interface GalleryImage {

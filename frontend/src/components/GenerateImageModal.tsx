@@ -23,6 +23,7 @@ interface Props {
 
 const MODEL_STORAGE_KEY = 'ai-rpg-img-models'
 const SELECTED_MODEL_KEY = 'ai-rpg-img-model'
+const RESOLUTION_KEY = 'ai-rpg-img-resolution'
 
 function loadCachedModels(): ImageModelInfo[] {
   try {
@@ -31,6 +32,17 @@ function loadCachedModels(): ImageModelInfo[] {
   } catch {
     return []
   }
+}
+
+function parsePixels(resolution: string): { w: number; h: number } | null {
+  const m = /^(\d+)x(\d+)$/.exec(resolution)
+  if (!m) return null
+  return { w: Number(m[1]), h: Number(m[2]) }
+}
+
+function formatCost(n: number): string {
+  // Show 4 decimals only if value is small (< 0.01)
+  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}`
 }
 
 export default function GenerateImageModal({
@@ -55,8 +67,10 @@ export default function GenerateImageModal({
   const [imageModels, setImageModels] = useState<ImageModelInfo[]>(loadCachedModels)
   const [modelSearch, setModelSearch] = useState(() => localStorage.getItem(SELECTED_MODEL_KEY) || '')
   const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem(SELECTED_MODEL_KEY) || '')
-  const [imgW, setImgW] = useState(1024)
-  const [imgH, setImgH] = useState(1024)
+  const [resolution, setResolution] = useState(() => localStorage.getItem(RESOLUTION_KEY) || '1024x1024')
+  const initialPixels = parsePixels(resolution) || { w: 1024, h: 1024 }
+  const [manualW, setManualW] = useState(initialPixels.w)
+  const [manualH, setManualH] = useState(initialPixels.h)
   const [numImages, setNumImages] = useState(1)
 
   // State
@@ -92,9 +106,49 @@ export default function GenerateImageModal({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Persist resolution
+  useEffect(() => {
+    localStorage.setItem(RESOLUTION_KEY, resolution)
+  }, [resolution])
+
+  // When the selected model changes, auto-pick a supported resolution if the current
+  // one isn't in the model's list, and clamp numImages to maxImages.
+  const selectedModelInfo = imageModels.find(m => m.id === selectedModel) || null
+  useEffect(() => {
+    if (!selectedModelInfo) return
+    const supported = selectedModelInfo.supportedResolutions
+    if (supported && supported.length && !supported.includes(resolution)) {
+      const next = supported[0]
+      setResolution(next)
+      const px = parsePixels(next)
+      if (px) {
+        setManualW(px.w)
+        setManualH(px.h)
+      }
+    }
+    const maxN = selectedModelInfo.maxImages ?? 4
+    if (numImages > maxN) setNumImages(maxN)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel, imageModels])
+
   if (!open) return null
 
-  const activePreset = DIMENSION_PRESETS.find(p => p.w === imgW && p.h === imgH)?.label || null
+  const activePreset = DIMENSION_PRESETS.find(p => p.w === manualW && p.h === manualH)?.label || null
+  const maxImagesForModel = selectedModelInfo?.maxImages ?? 4
+  const supportedRes = selectedModelInfo?.supportedResolutions
+  const pricing = selectedModelInfo?.pricing
+  const description = selectedModelInfo?.description?.trim() || ''
+
+  let costLine: string | null = null
+  if (pricing && Object.keys(pricing).length) {
+    const exact = pricing[resolution]
+    if (exact != null) {
+      costLine = `${formatCost(exact)} per image at ${resolution}`
+    } else {
+      const min = Math.min(...Object.values(pricing))
+      costLine = `from ${formatCost(min)} per image`
+    }
+  }
 
   const loadModels = async () => {
     setLoadingModels(true)
@@ -163,14 +217,15 @@ export default function GenerateImageModal({
     setGenerating(true)
     setError('')
     try {
-      const results = await api.generateImages(selectedModel, prompt.trim(), numImages, imgW, imgH)
+      const results = await api.generateImages(selectedModel, prompt.trim(), numImages, resolution)
+      const px = parsePixels(resolution)
       const newImages: GalleryImage[] = results.map(r => ({
         id: uid(),
         url: r.url,
         prompt: prompt.trim(),
         model: selectedModel,
-        width: imgW,
-        height: imgH,
+        width: px?.w ?? 0,
+        height: px?.h ?? 0,
         createdAt: Date.now(),
         source: defaultSource,
         loreEntryId: defaultLoreEntryId,
@@ -303,28 +358,61 @@ export default function GenerateImageModal({
               {loadingModels ? 'Loading...' : 'Load Models'}
             </button>
           )}
+          {(description || costLine) && (
+            <div className="gm-mi">
+              {description && <div className="gm-mi-d" title={description}>{description}</div>}
+              {costLine && <div className="gm-mi-c">{costLine}</div>}
+            </div>
+          )}
         </div>
 
         {/* Dimensions */}
         <div className="gr">
           <label className="lb">Dimensions</label>
-          <div className="gm-dims">
-            {DIMENSION_PRESETS.map(p => (
-              <button
-                key={p.label}
-                className={`b bs${activePreset === p.label ? ' ba' : ''}`}
-                onClick={() => { setImgW(p.w); setImgH(p.h) }}
-              >{p.label}</button>
-            ))}
-          </div>
+          {supportedRes && supportedRes.length > 0 ? (
+            <div className="gm-dims">
+              {supportedRes.map(r => (
+                <button
+                  key={r}
+                  className={`b bs${resolution === r ? ' ba' : ''}`}
+                  onClick={() => {
+                    setResolution(r)
+                    const px = parsePixels(r)
+                    if (px) {
+                      setManualW(px.w)
+                      setManualH(px.h)
+                    }
+                  }}
+                >{r}</button>
+              ))}
+            </div>
+          ) : (
+            <div className="gm-dims">
+              {DIMENSION_PRESETS.map(p => (
+                <button
+                  key={p.label}
+                  className={`b bs${activePreset === p.label && resolution === `${p.w}x${p.h}` ? ' ba' : ''}`}
+                  onClick={() => {
+                    setManualW(p.w)
+                    setManualH(p.h)
+                    setResolution(`${p.w}x${p.h}`)
+                  }}
+                >{p.label}</button>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '.4rem', alignItems: 'end', marginTop: '.4rem' }}>
             <div>
               <label className="lb">Width</label>
               <input
                 type="number"
-                value={imgW}
-                onChange={e => setImgW(Math.max(256, Number(e.target.value) || 256))}
-                step={64} min={256} max={2048}
+                value={manualW}
+                onChange={e => {
+                  const w = Math.max(256, Number(e.target.value) || 256)
+                  setManualW(w)
+                  setResolution(`${w}x${manualH}`)
+                }}
+                step={64} min={256} max={4096}
                 style={{ textAlign: 'center', fontSize: '.82rem', padding: '.35rem' }}
               />
             </div>
@@ -333,9 +421,13 @@ export default function GenerateImageModal({
               <label className="lb">Height</label>
               <input
                 type="number"
-                value={imgH}
-                onChange={e => setImgH(Math.max(256, Number(e.target.value) || 256))}
-                step={64} min={256} max={2048}
+                value={manualH}
+                onChange={e => {
+                  const h = Math.max(256, Number(e.target.value) || 256)
+                  setManualH(h)
+                  setResolution(`${manualW}x${h}`)
+                }}
+                step={64} min={256} max={4096}
                 style={{ textAlign: 'center', fontSize: '.82rem', padding: '.35rem' }}
               />
             </div>
@@ -348,7 +440,7 @@ export default function GenerateImageModal({
           <input
             type="range"
             min={1}
-            max={4}
+            max={maxImagesForModel}
             value={numImages}
             onChange={e => setNumImages(Number(e.target.value))}
           />

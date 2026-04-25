@@ -134,8 +134,12 @@ func ReasoningEnforced(modelID string) bool {
 // Image generation types.
 
 type ImageModel struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
+	ID                   string             `json:"id"`
+	Name                 string             `json:"name,omitempty"`
+	Description          string             `json:"description,omitempty"`
+	Pricing              map[string]float64 `json:"pricing,omitempty"`
+	SupportedResolutions []string           `json:"supportedResolutions,omitempty"`
+	MaxImages            int                `json:"maxImages,omitempty"`
 }
 
 type ImageResult struct {
@@ -143,16 +147,17 @@ type ImageResult struct {
 	B64JSON string `json:"b64_json,omitempty"`
 }
 
-// GenerateImage sends an image generation request to NanoGPT.
-func (c *Client) GenerateImage(ctx context.Context, model, prompt string, n, width, height int) ([]ImageResult, error) {
-	// Build request body — gpt-image models use different fields
+// GenerateImage sends an image generation request to NanoGPT. The resolution
+// string is passed through verbatim — pixel sizes ("1024x1024"), labels
+// ("1k", "2k", "4k"), and "auto" are all valid depending on the model.
+func (c *Client) GenerateImage(ctx context.Context, model, prompt string, n int, resolution string) ([]ImageResult, error) {
 	var body map[string]any
 	if strings.HasPrefix(model, "gpt-image") {
 		body = map[string]any{
 			"model":      model,
 			"prompt":     prompt,
 			"quality":    "low",
-			"resolution": fmt.Sprintf("%dx%d", width, height),
+			"resolution": resolution,
 			"nImages":    n,
 		}
 	} else {
@@ -160,7 +165,7 @@ func (c *Client) GenerateImage(ctx context.Context, model, prompt string, n, wid
 			"model":           model,
 			"prompt":          prompt,
 			"n":               n,
-			"size":            fmt.Sprintf("%dx%d", width, height),
+			"size":            resolution,
 			"response_format": "url",
 		}
 	}
@@ -225,12 +230,31 @@ func (c *Client) FetchImageModels(ctx context.Context) ([]ImageModel, error) {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
 
+	type rawImageModel struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Pricing     struct {
+			PerImage map[string]float64 `json:"per_image"`
+		} `json:"pricing"`
+		SupportedParameters struct {
+			Resolutions []string `json:"resolutions"`
+			MaxImages   int      `json:"max_images"`
+		} `json:"supported_parameters"`
+	}
+
 	models := make([]ImageModel, 0, len(raw.Data))
 	for _, d := range raw.Data {
-		// Models can be objects or plain strings
-		var m ImageModel
-		if err := json.Unmarshal(d, &m); err == nil && m.ID != "" {
-			models = append(models, m)
+		var rm rawImageModel
+		if err := json.Unmarshal(d, &rm); err == nil && rm.ID != "" {
+			models = append(models, ImageModel{
+				ID:                   rm.ID,
+				Name:                 rm.Name,
+				Description:          rm.Description,
+				Pricing:              rm.Pricing.PerImage,
+				SupportedResolutions: rm.SupportedParameters.Resolutions,
+				MaxImages:            rm.SupportedParameters.MaxImages,
+			})
 			continue
 		}
 		var s string
