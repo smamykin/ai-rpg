@@ -681,6 +681,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         onArcChange={v => setField('arc', v)}
         secsLength={state.secs.length}
         onShowTracking={() => openPanel('track')}
+        onGenerateImage={() => openGenModal('story')}
         onSpeak={handleSpeakLast}
         canSpeak={!!lastAINarration}
         ttsBusy={tts.isPlaying || tts.isLoading}

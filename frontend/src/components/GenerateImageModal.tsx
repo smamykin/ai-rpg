@@ -74,8 +74,14 @@ export default function GenerateImageModal({
     if (open) {
       setError('')
       setCtxLore(defaultSource === 'lore')
+      if (defaultSource === 'lore') {
+        const name = gameState.lore.find(l => l.id === defaultLoreEntryId)?.name?.trim()
+        setInstructions(name ? `An image of ${name}` : 'An image of this lore entry')
+      } else {
+        setInstructions('Depict the most recent scene')
+      }
     }
-  }, [open, defaultSource])
+  }, [open, defaultSource, defaultLoreEntryId, gameState.lore])
 
   // Close dropdown on outside click
   useEffect(() => {

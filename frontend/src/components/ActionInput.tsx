@@ -19,6 +19,7 @@ interface Props {
   onArcChange: (arc: string) => void
   secsLength: number
   onShowTracking: () => void
+  onGenerateImage: () => void
   onSpeak: () => void
   canSpeak: boolean
   ttsBusy: boolean
@@ -32,7 +33,7 @@ interface Props {
 export default function ActionInput({
   gen, busy, story, rollVariants, onSubmit, onContinue, onRegen, onDelete, onStop,
   showArc, onToggleArc, arc, onArcChange,
-  secsLength, onShowTracking,
+  secsLength, onShowTracking, onGenerateImage,
   onSpeak, canSpeak, ttsBusy, onStopTTS,
   thinkingSupported, thinkingOn, thinkingForced, onToggleThinking,
 }: Props) {
@@ -195,6 +196,9 @@ export default function ActionInput({
             ><Brain size={16} className="ic" /></button>
           )}
           <div style={{ flex: 1 }} />
+          {story.length > 100 && (
+            <button className="b bs" onClick={onGenerateImage} style={{ color: 'var(--ac)' }}>Image</button>
+          )}
           {secsLength === 0 && story.length > 100 && (
             <button className="b bs" onClick={onShowTracking} style={{ color: 'var(--ac)' }}>Track</button>
           )}
