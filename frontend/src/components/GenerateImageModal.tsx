@@ -87,6 +87,7 @@ export default function GenerateImageModal({
   useEffect(() => {
     if (open) {
       setError('')
+      setMode('ai')
       setCtxLore(defaultSource === 'lore')
       if (defaultSource === 'lore') {
         const name = gameState.lore.find(l => l.id === defaultLoreEntryId)?.name?.trim()
