@@ -4,6 +4,7 @@ import type { Section, GameState } from '../../types'
 import { uid } from '../../types'
 import PanelTabs from '../PanelTabs'
 import type { PanelId } from '../PanelTabs'
+import ExpandableTextarea from '../ExpandableTextarea'
 
 interface Props {
   show: boolean
@@ -38,7 +39,7 @@ export default function TrackingPanel({
           <div className="ax">
             <label className="lb">Add section {secs.length > 0 ? `(${secs.length}/5)` : ''}</label>
             <input type="text" value={nName} onChange={e => setNName(e.target.value)} placeholder="Name" style={{ marginBottom: '.35rem', fontSize: '.85rem', padding: '.4rem .6rem' }} />
-            <textarea value={nDesc} onChange={e => setNDesc(e.target.value)} placeholder="What to track" rows={2} style={{ fontSize: '.82rem', padding: '.4rem .6rem', marginBottom: '.35rem' }} />
+            <ExpandableTextarea value={nDesc} onChange={setNDesc} placeholder="What to track" rows={2} style={{ fontSize: '.82rem', padding: '.4rem .6rem', marginBottom: '.35rem' }} title="What to track" />
             <button className="b bs ba" onClick={() => {
               if (nName.trim() && secs.length < 5) {
                 dispatch({ type: 'ADD_SEC', sec: { id: uid(), name: nName.trim(), description: nDesc.trim(), content: '' } })
@@ -56,11 +57,12 @@ export default function TrackingPanel({
               <button className="b bs" onClick={() => dispatch({ type: 'REMOVE_SEC', id: s.id })} style={{ padding: '.15rem .4rem', fontSize: '.68rem' }} aria-label="Remove section"><X size={12} className="ic ic-muted" /></button>
             </div>
             {s.description && <div className="sd">{s.description}</div>}
-            <textarea
+            <ExpandableTextarea
               className="st2"
               value={s.content}
-              onChange={e => dispatch({ type: 'UPDATE_SEC', id: s.id, content: e.target.value })}
+              onChange={v => dispatch({ type: 'UPDATE_SEC', id: s.id, content: v })}
               placeholder="Click Update All..."
+              title={s.name || 'Tracked content'}
             />
           </div>
         ))}
