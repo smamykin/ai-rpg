@@ -140,7 +140,7 @@ Rules:
 
 	fmt.Fprintf(&sb, "<instructions>\n%s\n</instructions>\n", strings.TrimSpace(req.Instructions))
 
-	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), 500, "")
+	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), state.TokenCap("imagePrompt"), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

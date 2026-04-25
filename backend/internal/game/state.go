@@ -45,6 +45,9 @@ type GameState struct {
 	// Context budget (v5+)
 	EffectiveCtxTokens int `json:"effectiveCtxTokens,omitempty"`
 
+	// Per-session token caps (overrides built-in defaults; nil = default).
+	TokenCaps *TokenCaps `json:"tokenCaps,omitempty"`
+
 	Format string `json:"format,omitempty"`
 }
 

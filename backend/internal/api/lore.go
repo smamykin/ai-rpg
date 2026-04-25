@@ -22,12 +22,6 @@ var loreLengthDirectives = map[string]string{
 	"full":        "3-5 paragraphs, encyclopedia-style, cover every focus area fully. Use short sub-labels (History, Appearance, Role, etc.) if it helps organize.",
 }
 
-var loreLengthMaxTokens = map[string]int{
-	"concise":     300,
-	"descriptive": 600,
-	"full":        1200,
-}
-
 var loreModeDirectives = map[string]string{
 	"extract":  "Use ONLY facts in the context tags. If a focus area has no support, say what is unclear or unknown. Invent nothing.",
 	"enhance":  "Start from what the context tags say, then enrich with plausible, genre-fitting invention. Never contradict the context. Every fact in the context must survive; additions must be consistent.",
@@ -135,7 +129,7 @@ Rules:
 		fmt.Fprintf(&sb, "\n<user_instructions>\n%s\n</user_instructions>\n", strings.TrimSpace(req.Instructions))
 	}
 
-	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), loreLengthMaxTokens[length], "")
+	result, err := h.client.Complete(r.Context(), model, systemPrompt, sb.String(), state.TokenCap("lore"), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -208,7 +202,7 @@ func (h *Handlers) SuggestName(w http.ResponseWriter, r *http.Request) {
 		sb.WriteString("\nNo context provided — invent a fitting title.")
 	}
 
-	result, err := h.client.Complete(r.Context(), model, sys, sb.String(), 30, "")
+	result, err := h.client.Complete(r.Context(), model, sys, sb.String(), state.TokenCap("naming"), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

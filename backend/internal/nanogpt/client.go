@@ -63,7 +63,7 @@ func netErr(host string, err error) error {
 type ChatRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
-	MaxTokens int     `json:"max_tokens"`
+	MaxTokens int     `json:"max_tokens,omitempty"`
 	Stream   bool      `json:"stream"`
 	Stop     []string  `json:"stop,omitempty"`
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`

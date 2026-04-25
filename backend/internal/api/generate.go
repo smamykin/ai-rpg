@@ -102,7 +102,8 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prompt := game.BuildPrompt(state, req.Task, req.Action, req.HasRolls)
-	maxTokens := game.MaxTokensForStyle(state.Style)
+	effort := h.effortFor("story", state)
+	maxTokens := state.StoryCapForGen(state.Style, effort)
 
 	// Set up SSE
 	flusher, ok := w.(http.Flusher)
@@ -119,7 +120,6 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	stops := []string{"# Ambient Outro"}
 
-	effort := h.effortFor("story", state)
 	var lastReasoningLen int
 	result, err := h.client.CompleteStream(ctx, model, game.SystemPrompt, prompt, maxTokens, effort, stops, func(content, reasoning string) error {
 		// Emit reasoning event if it grew. We forward raw — no Clean() since
@@ -211,7 +211,7 @@ func (h *Handlers) Summarize(w http.ResponseWriter, r *http.Request) {
 		model,
 		systemPrompt,
 		userPrompt,
-		1000,
+		state.TokenCap("summarize"),
 		"",
 	)
 	if err != nil {
@@ -285,7 +285,7 @@ func (h *Handlers) UpdateStats(w http.ResponseWriter, r *http.Request) {
 		sb.String(), story,
 	)
 
-	raw, err := h.client.Complete(r.Context(), model, system, prompt, 1000, "")
+	raw, err := h.client.Complete(r.Context(), model, system, prompt, state.TokenCap("updateStats"), "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -388,7 +388,7 @@ func (h *Handlers) Transform(w http.ResponseWriter, r *http.Request) {
 	system := "You are a text editor for a narrative story. Return ONLY the transformed text — no preamble, no commentary, no wrapping quotes. Preserve the original tone and style. Do not extend or shorten the passage beyond what the instruction requires."
 	user := fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<text>\n%s\n</text>", strings.TrimSpace(req.Instruction), req.Text)
 
-	result, err := h.client.Complete(r.Context(), model, system, user, 2000, "")
+	result, err := h.client.Complete(r.Context(), model, system, user, state.TokenCap("transform"), "")
 	if err != nil {
 		log.Printf("Transform error: %v", err)
 		http.Error(w, "Transform failed: "+err.Error(), http.StatusBadGateway)

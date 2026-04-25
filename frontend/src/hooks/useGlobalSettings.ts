@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { TTSSettings, TTSModelSettings } from '../types'
+import type { TTSSettings, TTSModelSettings, TokenCaps } from '../types'
 
 const LS_KEY = 'ai-rpg-defaults'
 
@@ -9,6 +9,7 @@ export interface GlobalSettings {
   modelRoles: Record<string, string>
   reasoningEffort: string
   effectiveCtxTokens: number
+  tokenCaps: TokenCaps
   tts: TTSSettings
 }
 
@@ -18,6 +19,7 @@ export const GLOBAL_DEFAULTS: GlobalSettings = {
   modelRoles: {},
   reasoningEffort: '',
   effectiveCtxTokens: 32000,
+  tokenCaps: {},
   tts: { autoPlay: false, activeModel: 'Kokoro-82m', perModel: {} },
 }
 
@@ -30,6 +32,7 @@ export function readGlobalSettings(): GlobalSettings {
         ...GLOBAL_DEFAULTS,
         ...parsed,
         modelRoles: { ...GLOBAL_DEFAULTS.modelRoles, ...(parsed.modelRoles || {}) },
+        tokenCaps: { ...GLOBAL_DEFAULTS.tokenCaps, ...(parsed.tokenCaps || {}) },
         tts: { ...GLOBAL_DEFAULTS.tts, ...(parsed.tts || {}) },
       }
     }

@@ -69,6 +69,71 @@ export interface TTSSettings {
   perModel?: Record<string, TTSModelSettings>
 }
 
+// Per-task max_token caps. Undefined = use built-in default; 0 = no cap.
+// thinkingBonus is added on top of any base cap when reasoning effort is on.
+export interface TokenCaps {
+  storyShort?: number
+  storyMedium?: number
+  storyLong?: number
+  storyDetailed?: number
+  lore?: number
+  summarize?: number
+  updateStats?: number
+  transform?: number
+  imagePrompt?: number
+  naming?: number
+  thinkingBonus?: number
+}
+
+export const TOKEN_CAP_DEFAULTS: Required<TokenCaps> = {
+  storyShort: 150,
+  storyMedium: 400,
+  storyLong: 800,
+  storyDetailed: 1200,
+  lore: 1200,
+  summarize: 1000,
+  updateStats: 1000,
+  transform: 2000,
+  imagePrompt: 500,
+  naming: 30,
+  thinkingBonus: 20000,
+}
+
+export interface TokenCapField {
+  key: keyof TokenCaps
+  label: string
+  hint?: string
+}
+
+export const TOKEN_CAP_GROUPS: { name: string; fields: TokenCapField[] }[] = [
+  {
+    name: 'Story',
+    fields: [
+      { key: 'storyShort',    label: '1 sentence' },
+      { key: 'storyMedium',   label: '1 paragraph' },
+      { key: 'storyLong',     label: '2-3 paragraphs' },
+      { key: 'storyDetailed', label: '3-4 detailed paragraphs' },
+    ],
+  },
+  {
+    name: 'Support tasks',
+    fields: [
+      { key: 'lore',        label: 'Lore' },
+      { key: 'summarize',   label: 'Summary' },
+      { key: 'updateStats', label: 'Tracking update' },
+      { key: 'transform',   label: 'Selection transform' },
+      { key: 'imagePrompt', label: 'Image prompt' },
+      { key: 'naming',      label: 'Naming' },
+    ],
+  },
+  {
+    name: 'Reasoning',
+    fields: [
+      { key: 'thinkingBonus', label: 'Thinking bonus', hint: 'Added on top of the base cap when reasoning effort is on. Reasoning tokens count toward the API output budget.' },
+    ],
+  },
+]
+
 export interface GameState {
   sessionId: string
   name: string
@@ -101,6 +166,8 @@ export interface GameState {
 
   // Context budget
   effectiveCtxTokens: number
+
+  tokenCaps?: TokenCaps
 
   format?: string
 }

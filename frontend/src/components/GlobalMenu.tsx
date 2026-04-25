@@ -26,6 +26,7 @@ export default function GlobalMenu() {
         supportModel={gs.settings.supportModel}
         reasoningEffort={gs.settings.reasoningEffort}
         modelRoles={gs.settings.modelRoles}
+        tokenCaps={gs.settings.tokenCaps}
         effectiveCtxTokens={gs.settings.effectiveCtxTokens}
         setField={gs.setField}
         tts={gs.settings.tts}

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { X, Square, RefreshCw, Hourglass, Download, Save } from 'lucide-react'
-import type { ModelInfo, ModelRole, TTSSettings } from '../../types'
-import { MODEL_ROLES } from '../../types'
+import type { ModelInfo, ModelRole, TTSSettings, TokenCaps } from '../../types'
+import { MODEL_ROLES, TOKEN_CAP_DEFAULTS, TOKEN_CAP_GROUPS } from '../../types'
 import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, AMBIENT_BLUR_MIN, AMBIENT_BLUR_MAX } from '../../display'
 import type { DisplayPrefs } from '../../display'
 import PanelTabs from '../PanelTabs'
@@ -30,6 +30,7 @@ interface Props {
   supportModel: string
   reasoningEffort?: string
   modelRoles?: Record<string, string>
+  tokenCaps?: TokenCaps
   effectiveCtxTokens: number
   // Wide signature so both useGameState's and useGlobalSettings's setField
   // can be passed without TS choking on higher-rank generic narrowing.
@@ -51,7 +52,7 @@ interface Props {
 
 export default function SettingsPanel({
   show, onClose, onSwitch, visibleTabs, scope = 'session',
-  storyModel, supportModel, reasoningEffort, modelRoles,
+  storyModel, supportModel, reasoningEffort, modelRoles, tokenCaps,
   effectiveCtxTokens, setField,
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize, onSetEditorFontFamily, onSetEditorFontSize, onSetAmbientBg, onSetAmbientBlur,
   tts, dispatch, ttsPlaying, onStopTTS, onSaveAsDefaults,
@@ -194,6 +195,46 @@ export default function SettingsPanel({
               </div>
             )
           })}
+
+          <details className="adv" style={{ marginTop: '.6rem' }}>
+            <summary>Token caps</summary>
+            <div className="hint" style={{ marginBottom: '.5rem' }}>
+              Per-task <code>max_tokens</code> caps. Empty input = no cap. Reasoning tokens count as output tokens, so when thinking is on the bonus is added on top.
+            </div>
+            {TOKEN_CAP_GROUPS.map(group => (
+              <div key={group.name} style={{ marginBottom: '.5rem' }}>
+                <label className="lb" style={{ marginBottom: '.3rem' }}>{group.name}</label>
+                {group.fields.map(f => {
+                  const stored = tokenCaps?.[f.key]
+                  const def = TOKEN_CAP_DEFAULTS[f.key]
+                  return (
+                    <div key={f.key} className="gr" style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                      <label className="lb" style={{ flex: 1, marginBottom: 0 }}>{f.label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        placeholder={`default ${def}`}
+                        value={stored === undefined ? '' : stored}
+                        onChange={e => {
+                          const raw = e.target.value
+                          const next: TokenCaps = { ...(tokenCaps || {}) }
+                          if (raw === '') delete next[f.key]
+                          else {
+                            const n = Number(raw)
+                            if (Number.isFinite(n) && n >= 0) next[f.key] = Math.floor(n)
+                          }
+                          setField('tokenCaps', next)
+                        }}
+                        style={{ width: '110px' }}
+                      />
+                      {f.hint && <div className="hint" style={{ flexBasis: '100%', margin: 0 }}>{f.hint}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </details>
         </details>
 
         <div className="gr">

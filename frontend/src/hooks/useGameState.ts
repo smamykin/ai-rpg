@@ -242,13 +242,13 @@ function toPersistable(s: State): Partial<GameState> {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
     lore, secs, notes, rollVariants, diceRulesLoreId, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
-    effectiveCtxTokens, format,
+    effectiveCtxTokens, tokenCaps, format,
   } = s
   return {
     name, overview, style, cStyle, storyModel, supportModel, modelRoles, arc, diff,
     lore, secs, notes, rollVariants, diceRulesLoreId, auFreq, tts,
     chapters, activeChapterId, viewingChapterId, archivedChapters,
-    effectiveCtxTokens, format,
+    effectiveCtxTokens, tokenCaps, format,
   }
 }
 

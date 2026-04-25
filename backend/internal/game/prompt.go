@@ -203,7 +203,7 @@ func BuildPromptPreview(state *GameState, task, action string, hasRolls bool) Pr
 		Text:   SystemPrompt,
 		Tokens: estimateTokens(SystemPrompt),
 	}
-	response := MaxTokensForStyle(state.Style)
+	response := state.MaxTokensForStyle(state.Style)
 
 	total := sysSection.Tokens + response
 	for _, s := range sections {
@@ -290,22 +290,6 @@ func chapterTitleOrFallback(c Chapter) string {
 		return t
 	}
 	return ""
-}
-
-// MaxTokensForStyle returns the max_tokens value based on the response length style.
-func MaxTokensForStyle(style string) int {
-	switch style {
-	case "1 sentence":
-		return 150
-	case "1 paragraph":
-		return 400
-	case "2-3 paragraphs":
-		return 800
-	case "3-4 detailed paragraphs":
-		return 1200
-	default:
-		return 400
-	}
 }
 
 // SummarizeSystemPrompt is used for per-chapter summarization.

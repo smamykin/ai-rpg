@@ -14,6 +14,7 @@ function applyDefaults(st: GameState): GameState {
     effectiveCtxTokens: st.effectiveCtxTokens && st.effectiveCtxTokens !== GLOBAL_DEFAULTS.effectiveCtxTokens
       ? st.effectiveCtxTokens
       : defs.effectiveCtxTokens,
+    tokenCaps: { ...defs.tokenCaps, ...(st.tokenCaps || {}) },
     tts: hasCustomTTS(st.tts) ? st.tts : defs.tts,
   }
 }

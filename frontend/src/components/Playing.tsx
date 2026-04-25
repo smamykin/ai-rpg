@@ -14,7 +14,7 @@ import CheatsheetModal from './CheatsheetModal'
 import Lightbox from './Lightbox'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
-import type { Chapter, GameState, GalleryImage, TTSSettings, Turn } from '../types'
+import type { Chapter, GameState, GalleryImage, TokenCaps, TTSSettings, Turn } from '../types'
 import { renderChapterContent, detectThinkingModel } from '../types'
 import { Menu, Check, RotateCcw } from 'lucide-react'
 import { useGallery } from '../hooks/useGallery'
@@ -37,6 +37,7 @@ interface Props {
     supportModel: string
     reasoningEffort?: string
     modelRoles: Record<string, string>
+    tokenCaps?: TokenCaps
     name: string
     sessionId: string
     gen: boolean
@@ -484,6 +485,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         supportModel={state.supportModel}
         reasoningEffort={state.reasoningEffort}
         modelRoles={state.modelRoles}
+        tokenCaps={state.tokenCaps}
         effectiveCtxTokens={state.effectiveCtxTokens}
         setField={setField}
         displayPrefs={dp.prefs}
@@ -505,6 +507,7 @@ export default function Playing({ state, dispatch, setField, actions, computed }
             modelRoles: state.modelRoles || {},
             reasoningEffort: state.reasoningEffort || '',
             effectiveCtxTokens: state.effectiveCtxTokens,
+            tokenCaps: state.tokenCaps || {},
             tts: state.tts,
           })
           addToast('Saved as defaults for new adventures', 'success')
