@@ -6,19 +6,18 @@ import ExpandableTextarea from './ExpandableTextarea'
 
 interface Props {
   state: GameState
-  dispatch: React.Dispatch<any>
   setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
   onStart: () => void
   onBack: () => void
 }
 
-export default function Setup({ state, dispatch, setField, onStart, onBack }: Props) {
+export default function Setup({ state, setField, onStart, onBack }: Props) {
   return (
     <div className="R">
       <div className="hd">
         <button className="b bs" onClick={onBack} title="Back to sessions" aria-label="Back to sessions">&larr;</button>
         <h1>New Adventure</h1>
-        <GlobalMenu state={state} dispatch={dispatch} setField={setField} />
+        <GlobalMenu />
       </div>
 
       <div className="su">

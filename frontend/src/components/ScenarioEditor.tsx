@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import type { GameState, Scenario, Section } from '../types'
+import type { Scenario, Section } from '../types'
 import { defaultScenario, STYLES, uid } from '../types'
 import LoreEditor from './LoreEditor'
 import RollVariantsEditor from './RollVariantsEditor'
@@ -25,9 +25,6 @@ interface Props {
   onSaved: (sc: Scenario) => void
   onCancel: () => void
   onDeleted?: (id: string) => void
-  state: GameState
-  dispatch: React.Dispatch<any>
-  setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
 }
 
 function filenameFor(name: string): string {
@@ -35,7 +32,7 @@ function filenameFor(name: string): string {
   return s || 'scenario'
 }
 
-export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDeleted, state, dispatch, setField }: Props) {
+export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDeleted }: Props) {
   const [sc, setSc] = useState<Scenario>(() => defaultScenario())
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -120,7 +117,7 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
       <div className="R">
         <div className="hd">
           <h1>{scenarioId ? 'Edit scenario' : 'New scenario'}</h1>
-          <GlobalMenu state={state} dispatch={dispatch} setField={setField} />
+          <GlobalMenu />
         </div>
         <div className="load-splash">Loading&hellip;</div>
       </div>
@@ -131,7 +128,7 @@ export default function ScenarioEditor({ scenarioId, onSaved, onCancel, onDelete
     <div className="R">
       <div className="hd">
         <h1>{scenarioId ? 'Edit scenario' : 'New scenario'}</h1>
-        <GlobalMenu state={state} dispatch={dispatch} setField={setField} />
+        <GlobalMenu />
       </div>
 
       <div className="hub">

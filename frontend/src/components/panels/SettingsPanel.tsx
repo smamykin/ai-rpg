@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { X, Square, RefreshCw, Hourglass, Download } from 'lucide-react'
-import type { GameState, ModelInfo, ModelRole, TTSSettings } from '../../types'
+import { X, Square, RefreshCw, Hourglass, Download, Save } from 'lucide-react'
+import type { ModelInfo, ModelRole, TTSSettings } from '../../types'
 import { MODEL_ROLES } from '../../types'
 import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, AMBIENT_BLUR_MIN, AMBIENT_BLUR_MAX } from '../../display'
 import type { DisplayPrefs } from '../../display'
@@ -25,12 +25,15 @@ interface Props {
   onClose: () => void
   onSwitch?: (panel: PanelId) => void
   visibleTabs?: PanelId[]
+  scope?: 'session' | 'global'
   storyModel: string
   supportModel: string
   reasoningEffort?: string
   modelRoles?: Record<string, string>
   effectiveCtxTokens: number
-  setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
+  // Wide signature so both useGameState's and useGlobalSettings's setField
+  // can be passed without TS choking on higher-rank generic narrowing.
+  setField: (field: any, value: any) => void
   displayPrefs: DisplayPrefs
   onSetTheme: (id: string) => void
   onSetFontFamily: (name: string) => void
@@ -43,14 +46,15 @@ interface Props {
   dispatch: React.Dispatch<any>
   ttsPlaying: boolean
   onStopTTS: () => void
+  onSaveAsDefaults?: () => void
 }
 
 export default function SettingsPanel({
-  show, onClose, onSwitch, visibleTabs,
+  show, onClose, onSwitch, visibleTabs, scope = 'session',
   storyModel, supportModel, reasoningEffort, modelRoles,
   effectiveCtxTokens, setField,
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize, onSetEditorFontFamily, onSetEditorFontSize, onSetAmbientBg, onSetAmbientBlur,
-  tts, dispatch, ttsPlaying, onStopTTS,
+  tts, dispatch, ttsPlaying, onStopTTS, onSaveAsDefaults,
 }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
@@ -93,7 +97,7 @@ export default function SettingsPanel({
       <div className={`ov ${show ? 'o' : ''}`} onClick={onClose} />
       <div className={`pn ${show ? 'o' : ''}`}>
         <div className="ph">
-          <span>Settings</span>
+          <span>{scope === 'global' ? 'Defaults for new adventures' : 'Settings'}</span>
           <button className="b bs" onClick={onClose} aria-label="Close settings"><X size={16} className="ic ic-muted" /></button>
         </div>
         {onSwitch && <PanelTabs active="settings" onSwitch={onSwitch} visibleTabs={visibleTabs} />}
@@ -107,8 +111,17 @@ export default function SettingsPanel({
           </div>
         )}
 
-        <div style={{ margin: '0 0 .6rem' }}>
-          <label className="lb" style={{ marginBottom: '.5rem' }}>AI Model</label>
+        <div style={{ margin: '0 0 .6rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem' }}>
+          <label className="lb" style={{ marginBottom: 0 }}>AI Model</label>
+          {scope === 'session' && onSaveAsDefaults && (
+            <button
+              className="b bs"
+              onClick={onSaveAsDefaults}
+              title="Save current AI Model and TTS settings as defaults for new adventures"
+            >
+              <Save size={12} className="ic" /> Save as defaults
+            </button>
+          )}
         </div>
 
         <div className="gr">

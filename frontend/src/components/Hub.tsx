@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
-import type { GameState, SessionMeta } from '../types'
+import type { SessionMeta } from '../types'
 import ScenarioPicker from './ScenarioPicker'
 import SuggestNameButton from './SuggestNameButton'
 import GlobalMenu from './GlobalMenu'
@@ -16,9 +16,6 @@ interface Props {
   scenariosVersion?: number
   onEditScenario?: (id: string) => void
   onNewScenario?: () => void
-  state: GameState
-  dispatch: React.Dispatch<any>
-  setField: <K extends keyof GameState>(field: K, value: GameState[K]) => void
 }
 
 function formatDate(ts: number): string {
@@ -30,7 +27,7 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRename, onDelete, scenariosVersion, onEditScenario, onNewScenario, state, dispatch, setField }: Props) {
+export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRename, onDelete, scenariosVersion, onEditScenario, onNewScenario }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -64,7 +61,7 @@ export default function Hub({ sessions, current, busy, onSwitch, onCreate, onRen
     <div className="R">
       <div className="hd">
         <h1>AI RPG</h1>
-        <GlobalMenu state={state} dispatch={dispatch} setField={setField} />
+        <GlobalMenu />
       </div>
 
       <div className="hub">

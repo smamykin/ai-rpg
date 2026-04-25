@@ -1,6 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SessionMeta, GameState } from '../types'
 import * as api from '../api'
+import { readGlobalSettings, GLOBAL_DEFAULTS } from './useGlobalSettings'
+
+function applyDefaults(st: GameState): GameState {
+  const defs = readGlobalSettings()
+  return {
+    ...st,
+    storyModel: st.storyModel || defs.storyModel,
+    supportModel: st.supportModel || defs.supportModel,
+    modelRoles: Object.keys(st.modelRoles || {}).length ? st.modelRoles : defs.modelRoles,
+    reasoningEffort: st.reasoningEffort || defs.reasoningEffort,
+    effectiveCtxTokens: st.effectiveCtxTokens && st.effectiveCtxTokens !== GLOBAL_DEFAULTS.effectiveCtxTokens
+      ? st.effectiveCtxTokens
+      : defs.effectiveCtxTokens,
+    tts: hasCustomTTS(st.tts) ? st.tts : defs.tts,
+  }
+}
+
+function hasCustomTTS(tts: GameState['tts'] | undefined): boolean {
+  if (!tts) return false
+  if (tts.autoPlay) return true
+  if (tts.activeModel && tts.activeModel !== GLOBAL_DEFAULTS.tts.activeModel) return true
+  if (tts.perModel && Object.keys(tts.perModel).length > 0) return true
+  return false
+}
 
 interface UseSessionsHelpers {
   flushPendingSave: () => Promise<void>
@@ -34,7 +58,8 @@ export function useSessions(helpers: UseSessionsHelpers) {
     try {
       await helpers.flushPendingSave()
       helpers.abortGeneration()
-      const st = await api.createSession(name, scenarioId)
+      const raw = await api.createSession(name, scenarioId)
+      const st = applyDefaults(raw)
       api.setCurrentSessionId(st.sessionId)
       helpers.onLoaded(st)
       await refresh()

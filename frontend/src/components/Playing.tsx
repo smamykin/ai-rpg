@@ -21,6 +21,7 @@ import { useGallery } from '../hooks/useGallery'
 import { useToast } from '../hooks/useToast'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
 import { useTTS } from '../hooks/useTTS'
+import { writeGlobalSettings } from '../hooks/useGlobalSettings'
 import { getModelMeta, getModelSettings } from '../constants/tts'
 import { estimatePromptTokens, budgetLevel } from '../utils/budget'
 
@@ -497,6 +498,17 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         dispatch={dispatch}
         ttsPlaying={tts.isPlaying || tts.isLoading}
         onStopTTS={tts.stop}
+        onSaveAsDefaults={() => {
+          writeGlobalSettings({
+            storyModel: state.storyModel,
+            supportModel: state.supportModel,
+            modelRoles: state.modelRoles || {},
+            reasoningEffort: state.reasoningEffort || '',
+            effectiveCtxTokens: state.effectiveCtxTokens,
+            tts: state.tts,
+          })
+          addToast('Saved as defaults for new adventures', 'success')
+        }}
       />
 
       <GenerateImageModal
