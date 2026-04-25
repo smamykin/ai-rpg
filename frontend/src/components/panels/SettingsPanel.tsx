@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Square, RefreshCw, Hourglass, Download, Save } from 'lucide-react'
-import type { ModelInfo, ModelRole, TTSSettings, TokenCaps } from '../../types'
+import type { ModelRole, TTSSettings, TokenCaps } from '../../types'
 import { MODEL_ROLES, TOKEN_CAP_DEFAULTS, TOKEN_CAP_GROUPS } from '../../types'
 import { THEMES, FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, AMBIENT_BLUR_MIN, AMBIENT_BLUR_MAX } from '../../display'
 import type { DisplayPrefs } from '../../display'
@@ -10,7 +10,7 @@ import ModelPicker from '../ModelPicker'
 import ModalTextField from '../ModalTextField'
 import { TTS_MODELS, TTS_VOICES, getModelMeta, getModelSettings } from '../../constants/tts'
 import { useInstallPrompt } from '../../hooks/useInstallPrompt'
-import * as apiClient from '../../api'
+import { useModels } from '../../hooks/useModels'
 
 const ROLE_LABELS: Record<ModelRole, { name: string; hint: string }> = {
   summary:        { name: 'Summaries',      hint: 'Compressing old story into memory. Cheap + long-context works well.' },
@@ -57,23 +57,9 @@ export default function SettingsPanel({
   displayPrefs, onSetTheme, onSetFontFamily, onSetFontSize, onSetEditorFontFamily, onSetEditorFontSize, onSetAmbientBg, onSetAmbientBlur,
   tts, dispatch, ttsPlaying, onStopTTS, onSaveAsDefaults,
 }: Props) {
-  const [models, setModels] = useState<ModelInfo[]>([])
-  const [modelsLoading, setModelsLoading] = useState(false)
-  const [modelsErr, setModelsErr] = useState('')
+  const { models, loading: modelsLoading, error: modelsErr, reload: loadModels } = useModels()
   const [ctxDraft, setCtxDraft] = useState<string | null>(null)
   const install = useInstallPrompt()
-
-  const loadModels = useCallback(async () => {
-    setModelsLoading(true)
-    setModelsErr('')
-    try {
-      const list = await apiClient.getModels()
-      setModels(list)
-    } catch (e) {
-      setModelsErr(e instanceof Error ? e.message : 'Failed to load models')
-    }
-    setModelsLoading(false)
-  }, [])
 
   useEffect(() => {
     if (show && models.length === 0 && !modelsLoading) {
@@ -249,7 +235,7 @@ export default function SettingsPanel({
             <option value="high">High</option>
             <option value="xhigh">Extra high</option>
           </select>
-          <div className="hint">For thinking models (gpt-5, o1, deepseek-r1, claude :thinking variants). Reasoning tokens count as output tokens.</div>
+          <div className="hint">Only used by reasoning-capable models. Reasoning tokens count as output tokens.</div>
         </div>
 
         <div className="gr">

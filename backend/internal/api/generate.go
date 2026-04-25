@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ai-rpg-v2/internal/game"
+	"ai-rpg-v2/internal/nanogpt"
 )
 
 type GenerateRequest struct {
@@ -58,12 +59,34 @@ func (h *Handlers) resolveModel(role string, state *game.GameState) string {
 // effortFor returns the reasoning_effort to send for a given task role.
 // Only the story role honors the user's setting; all support tasks (summary,
 // stats, transform, lore, image-prompt, naming) opt out so reasoning never
-// leaks into structured outputs.
+// leaks into structured outputs. For variants that bake reasoning in (the
+// "-thinking" / ":thinking" suffix), we omit reasoning_effort=none so we don't
+// fight the model's default depth — but still pass an explicit low/medium/high
+// when the user picked one.
 func (h *Handlers) effortFor(role string, state *game.GameState) string {
-	if role == "story" && state != nil {
-		return state.ReasoningEffort
+	if role != "story" || state == nil {
+		return ""
 	}
-	return ""
+	e := state.ReasoningEffort
+	if nanogpt.ReasoningEnforced(state.StoryModel) && (e == "" || e == "none") {
+		return ""
+	}
+	return e
+}
+
+// thinkingActiveForStory returns true when the story call will produce
+// reasoning tokens — either because the user enabled it or because the model
+// variant always reasons. Used to decide whether to apply the thinking bonus
+// to the output cap.
+func (h *Handlers) thinkingActiveForStory(state *game.GameState) bool {
+	if state == nil {
+		return false
+	}
+	if nanogpt.ReasoningEnforced(state.StoryModel) {
+		return true
+	}
+	e := state.ReasoningEffort
+	return e != "" && e != "none"
 }
 
 // Generate handles story generation with SSE streaming.
@@ -110,7 +133,7 @@ func (h *Handlers) Generate(w http.ResponseWriter, r *http.Request) {
 
 	prompt := game.BuildPrompt(state, req.Task, req.Action, req.Roll)
 	effort := h.effortFor("story", state)
-	maxTokens := state.StoryCapForGen(state.Style, effort)
+	maxTokens := state.StoryCapForGen(state.Style, h.thinkingActiveForStory(state))
 
 	// Set up SSE
 	flusher, ok := w.(http.Flusher)

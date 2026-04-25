@@ -25,6 +25,7 @@ interface Props {
   onStopTTS: () => void
   thinkingSupported: boolean
   thinkingOn: boolean
+  thinkingForced: boolean
   onToggleThinking: () => void
 }
 
@@ -33,7 +34,7 @@ export default function ActionInput({
   showArc, onToggleArc, arc, onArcChange,
   secsLength, onShowTracking,
   onSpeak, canSpeak, ttsBusy, onStopTTS,
-  thinkingSupported, thinkingOn, onToggleThinking,
+  thinkingSupported, thinkingOn, thinkingForced, onToggleThinking,
 }: Props) {
   const [action, setAction] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -176,11 +177,19 @@ export default function ActionInput({
           {thinkingSupported && (
             <button
               className={`b bs${thinkingOn ? ' ba' : ''}`}
-              onClick={onToggleThinking}
-              disabled={blocked}
-              title={thinkingOn ? 'Thinking on (click to disable)' : 'Thinking off (click to enable)'}
+              onClick={thinkingForced ? undefined : onToggleThinking}
+              disabled={blocked && !thinkingForced}
+              title={
+                thinkingForced
+                  ? 'Model reasons by default — can’t be turned off'
+                  : thinkingOn
+                    ? 'Thinking on (click to disable)'
+                    : 'Thinking off (click to enable)'
+              }
               aria-label="Toggle thinking"
               aria-pressed={thinkingOn}
+              aria-disabled={thinkingForced || undefined}
+              style={thinkingForced ? { cursor: 'default' } : undefined}
             ><Brain size={16} className="ic" /></button>
           )}
           <div style={{ flex: 1 }} />

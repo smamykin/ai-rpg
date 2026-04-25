@@ -1,4 +1,4 @@
-.PHONY: up down build logs restart backend frontend check open prod prod-build prod-down prod-logs
+.PHONY: up down build logs restart backend frontend check check-local check-fe check-be open prod prod-build prod-down prod-logs
 
 # ── Development ──────────────────────────────────
 
@@ -34,9 +34,20 @@ backend:
 frontend:
 	docker compose logs -f frontend
 
-## TypeScript check
+## TypeScript check (inside running container)
 check:
 	docker compose exec frontend npx tsc --noEmit
+
+## Frontend type-check on host (uses nvm)
+check-fe:
+	cd frontend && . $$HOME/.nvm/nvm.sh && nvm use --silent && npx tsc -b
+
+## Backend build on host
+check-be:
+	cd backend && go build ./...
+
+## Run both host-side checks (frontend tsc + backend go build)
+check-local: check-be check-fe
 
 ## Open dev in browser
 open:

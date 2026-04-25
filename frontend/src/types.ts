@@ -302,9 +302,19 @@ export type ModelRole = typeof MODEL_ROLES[number]
 export const REASONING_EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh'] as const
 export type ReasoningEffort = typeof REASONING_EFFORTS[number]
 
-// Mirrors backend nanogpt.DetectsThinking — keep the patterns in sync.
+// Fallback used before the models list has loaded. Mirrors the backend
+// nanogpt.DetectsThinking heuristic — keep the patterns in sync. Once
+// /api/models has returned, prefer ModelInfo.supportsThinking, which comes
+// from the API's authoritative capabilities.reasoning flag.
 export function detectThinkingModel(id: string): boolean {
   return /(gpt-5|o1-|o3-|o4-|:thinking|-thinking|deepseek-r1|qwen3-thinking|grok-4-reasoning)/i.test(id || '')
+}
+
+// Fallback for ReasoningEnforced — suffix-only, mirrors backend
+// nanogpt.ReasoningEnforced.
+export function detectReasoningEnforced(id: string): boolean {
+  const s = (id || '').toLowerCase()
+  return s.endsWith('-thinking') || s.endsWith(':thinking')
 }
 
 export interface ModelInfo {
@@ -313,6 +323,7 @@ export interface ModelInfo {
   ctx: number
   price: number | null
   supportsThinking: boolean
+  reasoningEnforced: boolean
 }
 
 export interface ImageModelInfo {

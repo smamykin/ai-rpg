@@ -41,10 +41,10 @@ func resolve(p *int, fallback int) int {
 	return *p
 }
 
-// applyThinking returns base + the thinking bonus when effort is set.
+// applyThinking returns base + the thinking bonus when reasoning is active.
 // A base of 0 (no cap) stays 0 — the bonus is meaningless without a cap.
-func applyThinking(base int, effort string, bonus int) int {
-	if base == 0 || effort == "" || effort == "none" {
+func applyThinking(base int, thinkingActive bool, bonus int) int {
+	if base == 0 || !thinkingActive {
 		return base
 	}
 	return base + bonus
@@ -94,16 +94,16 @@ func (s *GameState) ThinkingBonus() int {
 	return resolve(s.tokenCaps().ThinkingBonus, DefaultThinkingBonus)
 }
 
-// StoryCapForGen combines style cap + thinking bonus when effort is on.
-func (s *GameState) StoryCapForGen(style, effort string) int {
-	return applyThinking(s.MaxTokensForStyle(style), effort, s.ThinkingBonus())
+// StoryCapForGen combines style cap + thinking bonus when reasoning is active.
+func (s *GameState) StoryCapForGen(style string, thinkingActive bool) int {
+	return applyThinking(s.MaxTokensForStyle(style), thinkingActive, s.ThinkingBonus())
 }
 
 // TokenCapForGen combines a role cap with the thinking bonus.
 // Used when the call honors reasoning effort (currently only the story does).
 // Support tasks should call TokenCap directly.
-func (s *GameState) TokenCapForGen(role, effort string) int {
-	return applyThinking(s.TokenCap(role), effort, s.ThinkingBonus())
+func (s *GameState) TokenCapForGen(role string, thinkingActive bool) int {
+	return applyThinking(s.TokenCap(role), thinkingActive, s.ThinkingBonus())
 }
 
 // tokenCaps returns a non-nil TokenCaps to simplify lookups on a nil receiver

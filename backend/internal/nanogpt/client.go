@@ -93,15 +93,18 @@ type Model struct {
 }
 
 type ModelResponse struct {
-	ID               string   `json:"id"`
-	Name             string   `json:"name,omitempty"`
-	Ctx              int      `json:"ctx"`
-	Price            *float64 `json:"price"`
-	SupportsThinking bool     `json:"supportsThinking"`
+	ID                string   `json:"id"`
+	Name              string   `json:"name,omitempty"`
+	Ctx               int      `json:"ctx"`
+	Price             *float64 `json:"price"`
+	SupportsThinking  bool     `json:"supportsThinking"`
+	ReasoningEnforced bool     `json:"reasoningEnforced"`
 }
 
-// DetectsThinking returns true if the model ID matches a known reasoning-capable
-// pattern. Mirrors the heuristic in frontend/src/types.ts (detectThinkingModel).
+// DetectsThinking is the fallback used when the NanoGPT models endpoint does not
+// return a capabilities object — it guesses from the model ID. Prefer the
+// authoritative capabilities.reasoning flag returned by /v1/models?detailed=true.
+// Mirrors the heuristic in frontend/src/types.ts (detectThinkingModel).
 func DetectsThinking(modelID string) bool {
 	s := strings.ToLower(modelID)
 	patterns := []string{
@@ -115,6 +118,17 @@ func DetectsThinking(modelID string) bool {
 		}
 	}
 	return false
+}
+
+// ReasoningEnforced returns true for variant aliases that bake reasoning into
+// the model itself (e.g. "z.ai/glm-4.7-thinking", "claude-3-5-sonnet:thinking").
+// For these the reasoning_effort=none signal should not be sent — the model
+// always reasons — and the thinking bonus should always be applied to the
+// output cap. The check is intentionally suffix-only so unrelated mid-string
+// matches don't trigger it.
+func ReasoningEnforced(modelID string) bool {
+	s := strings.ToLower(modelID)
+	return strings.HasSuffix(s, "-thinking") || strings.HasSuffix(s, ":thinking")
 }
 
 // Image generation types.
@@ -379,9 +393,11 @@ func (c *Client) CompleteStream(ctx context.Context, model, system, user string,
 	return full.String(), nil
 }
 
-// FetchModels retrieves the list of available models.
+// FetchModels retrieves the list of available models. Uses detailed=true so the
+// response includes the capabilities object, which is the authoritative source
+// for whether a model supports the reasoning_effort parameter.
 func (c *Client) FetchModels(ctx context.Context) ([]ModelResponse, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, "GET", ModelsEndpoint, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", ModelsEndpoint+"?detailed=true", nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -405,6 +421,9 @@ func (c *Client) FetchModels(ctx context.Context) ([]ModelResponse, error) {
 			Name                 string  `json:"name"`
 			ContextLength        int     `json:"context_length"`
 			InputPricePerMillion float64 `json:"input_price_per_million"`
+			Capabilities         *struct {
+				Reasoning bool `json:"reasoning"`
+			} `json:"capabilities"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
@@ -413,11 +432,18 @@ func (c *Client) FetchModels(ctx context.Context) ([]ModelResponse, error) {
 
 	models := make([]ModelResponse, 0, len(raw.Data))
 	for _, m := range raw.Data {
+		var supports bool
+		if m.Capabilities != nil {
+			supports = m.Capabilities.Reasoning
+		} else {
+			supports = DetectsThinking(m.ID)
+		}
 		mr := ModelResponse{
-			ID:               m.ID,
-			Name:             m.Name,
-			Ctx:              m.ContextLength,
-			SupportsThinking: DetectsThinking(m.ID),
+			ID:                m.ID,
+			Name:              m.Name,
+			Ctx:               m.ContextLength,
+			SupportsThinking:  supports,
+			ReasoningEnforced: supports && ReasoningEnforced(m.ID),
 		}
 		if mr.Name == "" {
 			mr.Name = m.ID
