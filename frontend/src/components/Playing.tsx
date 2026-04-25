@@ -15,13 +15,12 @@ import Lightbox from './Lightbox'
 import ToastContainer from './Toast'
 import type { PanelId } from './PanelTabs'
 import type { Chapter, GameState, GalleryImage, TokenCaps, TTSSettings, Turn } from '../types'
-import { renderChapterContent, detectThinkingModel, detectReasoningEnforced } from '../types'
+import { renderChapterContent } from '../types'
 import { Menu, Check, RotateCcw } from 'lucide-react'
 import { useGallery } from '../hooks/useGallery'
 import { useToast } from '../hooks/useToast'
 import { useDisplayPrefs } from '../hooks/useDisplayPrefs'
 import { useTTS } from '../hooks/useTTS'
-import { useModels } from '../hooks/useModels'
 import { writeGlobalSettings } from '../hooks/useGlobalSettings'
 import { getModelMeta, getModelSettings } from '../constants/tts'
 import { estimatePromptTokens, budgetLevel } from '../utils/budget'
@@ -335,23 +334,6 @@ export default function Playing({ state, dispatch, setField, actions, computed }
 
   const streamingWords = state.streaming ? state.streaming.trim().split(/\s+/).length : 0
   const reasoningWords = state.streamingReasoning ? state.streamingReasoning.trim().split(/\s+/).length : 0
-  const { models } = useModels()
-  const modelInfo = models.find(m => m.id === state.storyModel)
-  const reasoningCapable = modelInfo ? modelInfo.supportsThinking : detectThinkingModel(state.storyModel)
-  const reasoningEnforced = modelInfo ? modelInfo.reasoningEnforced : detectReasoningEnforced(state.storyModel)
-  const thinkingSupported = reasoningCapable
-  const thinkingForced = reasoningCapable && reasoningEnforced
-  const userThinkingOn = !!state.reasoningEffort && state.reasoningEffort !== 'none'
-  const thinkingOn = thinkingForced || userThinkingOn
-  const onToggleThinking = () => {
-    if (thinkingForced) return
-    if (userThinkingOn) {
-      setField('reasoningEffort', 'none')
-    } else {
-      const last = state.reasoningEffort && state.reasoningEffort !== 'none' ? state.reasoningEffort : 'low'
-      setField('reasoningEffort', last)
-    }
-  }
   const [reasoningOpen, setReasoningOpen] = useState(false)
   useEffect(() => {
     if (state.genStage !== 'thinking') setReasoningOpen(false)
@@ -686,10 +668,6 @@ export default function Playing({ state, dispatch, setField, actions, computed }
         canSpeak={!!lastAINarration}
         ttsBusy={tts.isPlaying || tts.isLoading}
         onStopTTS={tts.stop}
-        thinkingSupported={thinkingSupported}
-        thinkingOn={thinkingOn}
-        thinkingForced={thinkingForced}
-        onToggleThinking={onToggleThinking}
       />
 
       {/* Toasts */}

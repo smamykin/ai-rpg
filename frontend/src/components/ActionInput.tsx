@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, Brain, ChevronDown } from 'lucide-react'
+import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, ChevronDown } from 'lucide-react'
 import type { RollVariant } from '../types'
 import { rollVariant as rollVariantDice, formatRolled, diceExpr } from '../utils/dice'
 
@@ -24,10 +24,6 @@ interface Props {
   canSpeak: boolean
   ttsBusy: boolean
   onStopTTS: () => void
-  thinkingSupported: boolean
-  thinkingOn: boolean
-  thinkingForced: boolean
-  onToggleThinking: () => void
 }
 
 export default function ActionInput({
@@ -35,7 +31,6 @@ export default function ActionInput({
   showArc, onToggleArc, arc, onArcChange,
   secsLength, onShowTracking, onGenerateImage,
   onSpeak, canSpeak, ttsBusy, onStopTTS,
-  thinkingSupported, thinkingOn, thinkingForced, onToggleThinking,
 }: Props) {
   const [action, setAction] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -177,24 +172,6 @@ export default function ActionInput({
             <button className="b bs" onClick={onSpeak} disabled={!canSpeak} title="Read last narration" aria-label="Read last narration"><Volume2 size={16} className="ic" /></button>
           )}
           <button className={`b bs${showArc ? ' ba' : ''}`} onClick={onToggleArc} title="Arc guidance" aria-label="Toggle arc guidance" aria-pressed={showArc}><Target size={16} className="ic" /></button>
-          {thinkingSupported && (
-            <button
-              className={`b bs${thinkingOn ? ' ba' : ''}`}
-              onClick={thinkingForced ? undefined : onToggleThinking}
-              disabled={blocked && !thinkingForced}
-              title={
-                thinkingForced
-                  ? 'Model reasons by default — can’t be turned off'
-                  : thinkingOn
-                    ? 'Thinking on (click to disable)'
-                    : 'Thinking off (click to enable)'
-              }
-              aria-label="Toggle thinking"
-              aria-pressed={thinkingOn}
-              aria-disabled={thinkingForced || undefined}
-              style={thinkingForced ? { cursor: 'default' } : undefined}
-            ><Brain size={16} className="ic" /></button>
-          )}
           <div style={{ flex: 1 }} />
           {story.length > 100 && (
             <button className="b bs" onClick={onGenerateImage} style={{ color: 'var(--ac)' }}>Image</button>
