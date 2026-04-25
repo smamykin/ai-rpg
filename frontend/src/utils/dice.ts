@@ -9,6 +9,9 @@ export interface RolledDie {
 
 const DICE_RE = /^(\d+)d(\d+)$/
 
+// parseDice is the legacy "NdM" string parser, retained for migration only
+// (validateScenario / one-shot legacy data loaders). Live UI talks to the
+// numeric count/sides fields directly.
 export function parseDice(expr: string): { count: number; sides: number } | null {
   const m = DICE_RE.exec((expr || '').trim())
   if (!m) return null
@@ -18,6 +21,16 @@ export function parseDice(expr: string): { count: number; sides: number } | null
   return { count, sides }
 }
 
+// diceExpr renders a DiceSpec as the canonical "NdM" notation used in roll
+// text and the prompt's <task> block.
+export function diceExpr(spec: DiceSpec): string {
+  return `${spec.count}d${spec.sides}`
+}
+
+function specValid(spec: DiceSpec): boolean {
+  return spec.count >= 1 && spec.count <= 100 && spec.sides >= 1 && spec.sides <= 1000
+}
+
 export function rollOne(count: number, sides: number): number[] {
   const out: number[] = []
   for (let i = 0; i < count; i++) out.push(1 + Math.floor(Math.random() * sides))
@@ -25,9 +38,8 @@ export function rollOne(count: number, sides: number): number[] {
 }
 
 export function rollSpec(spec: DiceSpec): RolledDie {
-  const parsed = parseDice(spec.dice)
-  if (!parsed) return { spec, total: 0, rolls: [], invalid: true }
-  const rolls = rollOne(parsed.count, parsed.sides)
+  if (!specValid(spec)) return { spec, total: 0, rolls: [], invalid: true }
+  const rolls = rollOne(spec.count, spec.sides)
   return { spec, total: rolls.reduce((a, b) => a + b, 0), rolls }
 }
 
@@ -55,9 +67,9 @@ export function combineActionAndRoll(action: string, roll: string): string {
 export function formatRolled(rolled: RolledDie[], startIndex: number, variantName?: string): string {
   const body = rolled.map((r, i) => {
     const n = startIndex + i
-    if (r.invalid) return `dice ${n}(invalid dice: ${r.spec.dice})`
+    if (r.invalid) return `dice ${n}(invalid dice: ${diceExpr(r.spec)})`
     const type = r.spec.type ? `${r.spec.type} ` : ''
-    return `dice ${n}(${type}${r.spec.dice}) resulted ${r.total}`
+    return `dice ${n}(${type}${diceExpr(r.spec)}) resulted ${r.total}`
   }).join(', ')
   const name = (variantName || '').trim()
   return name ? `[${name}] ${body}` : body

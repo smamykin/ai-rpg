@@ -1,7 +1,6 @@
 import { X, Plus } from 'lucide-react'
 import type { RollVariant, DiceSpec } from '../types'
 import { uid } from '../types'
-import { parseDice } from '../utils/dice'
 import ModalTextField from './ModalTextField'
 
 interface Props {
@@ -13,8 +12,12 @@ interface Props {
 
 const EXAMPLE_RULES_TEXT = 'Roll the dice and sum the results. 2 = success, 1 = miss. On success, the player gets their way; on a miss, something goes wrong — narrate a light complication.'
 
+function newDie(): DiceSpec {
+  return { count: 1, sides: 6, type: '' }
+}
+
 function newVariant(): RollVariant {
-  return { id: uid('rv'), name: '', dice: [{ dice: '1d6', type: '' }] }
+  return { id: uid('rv'), name: '', dice: [newDie()] }
 }
 
 export default function RollVariantsEditor({ variants, diceRules, onChange, onDiceRulesChange }: Props) {
@@ -33,7 +36,7 @@ export default function RollVariantsEditor({ variants, diceRules, onChange, onDi
   const addDie = (vid: string) => {
     const v = variants.find(x => x.id === vid)
     if (!v) return
-    updateVariant(vid, { dice: [...v.dice, { dice: '1d6', type: '' }] })
+    updateVariant(vid, { dice: [...v.dice, newDie()] })
   }
 
   const updateDie = (vid: string, idx: number, patch: Partial<DiceSpec>) => {
@@ -53,7 +56,7 @@ export default function RollVariantsEditor({ variants, diceRules, onChange, onDi
     onChange([...variants, {
       id: uid('rv'),
       name: 'Coin flip',
-      dice: [{ dice: '1d2', type: 'white' }],
+      dice: [{ count: 1, sides: 2, type: 'white' }],
     }])
   }
 
@@ -105,15 +108,28 @@ export default function RollVariantsEditor({ variants, diceRules, onChange, onDi
 
           <label className="lb" style={{ marginTop: '.15rem' }}>Dice</label>
           {v.dice.map((d, i) => {
-            const valid = !!parseDice(d.dice)
+            const countOk = d.count >= 1 && d.count <= 100
+            const sidesOk = d.sides >= 1 && d.sides <= 1000
             return (
               <div key={i} style={{ display: 'flex', gap: '.3rem', marginBottom: '.3rem', alignItems: 'center' }}>
                 <input
-                  type="text"
-                  value={d.dice}
-                  onChange={e => updateDie(v.id, i, { dice: e.target.value })}
-                  placeholder="2d6"
-                  style={{ width: '5.5rem', fontSize: '.82rem', padding: '.3rem .45rem', borderColor: valid ? undefined : 'var(--dng)' }}
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={d.count}
+                  onChange={e => updateDie(v.id, i, { count: parseInt(e.target.value, 10) || 0 })}
+                  style={{ width: '3.2rem', fontSize: '.82rem', padding: '.3rem .45rem', borderColor: countOk ? undefined : 'var(--dng)' }}
+                  aria-label="Dice count"
+                />
+                <span style={{ color: 'var(--mt)', fontSize: '.82rem' }}>d</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={d.sides}
+                  onChange={e => updateDie(v.id, i, { sides: parseInt(e.target.value, 10) || 0 })}
+                  style={{ width: '4rem', fontSize: '.82rem', padding: '.3rem .45rem', borderColor: sidesOk ? undefined : 'var(--dng)' }}
+                  aria-label="Dice sides"
                 />
                 <input
                   type="text"

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { X, Square, Play, SkipForward, RefreshCw, Trash2, Volume2, Target, Brain, ChevronDown } from 'lucide-react'
 import type { RollVariant } from '../types'
-import { rollVariant as rollVariantDice, formatRolled } from '../utils/dice'
+import { rollVariant as rollVariantDice, formatRolled, diceExpr } from '../utils/dice'
 
 interface Props {
   gen: boolean
@@ -157,7 +157,7 @@ export default function ActionInput({
                   >
                     <span>{v.name || '(unnamed)'}</span>
                     <span className="dd-i-sub">
-                      {v.dice.map(d => `${d.type ? d.type + ' ' : ''}${d.dice}`).join(', ') || 'no dice'}
+                      {v.dice.map(d => `${d.type ? d.type + ' ' : ''}${diceExpr(d)}`).join(', ') || 'no dice'}
                     </span>
                   </button>
                 ))}

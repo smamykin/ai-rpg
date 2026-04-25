@@ -3,6 +3,8 @@ package game
 import (
 	"fmt"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -175,12 +177,16 @@ type Note struct {
 	UpdatedAt int64  `json:"updatedAt,omitempty"`
 }
 
-// DiceSpec is one die definition inside a RollVariant: a dice expression like
-// "2d6" paired with a free-form type label (e.g. "red", "blue") that appears
+// DiceSpec is one die definition inside a RollVariant: a dice expression
+// (Count d Sides, e.g. 2d6) paired with a free-form type label that appears
 // in the formatted roll text.
 type DiceSpec struct {
-	Dice string `json:"dice"`
-	Type string `json:"type"`
+	Count int    `json:"count"`
+	Sides int    `json:"sides"`
+	Type  string `json:"type"`
+	// Deprecated: legacy "NdM" string from before count/sides were split out.
+	// Migrated on load and dropped from saves via omitempty.
+	Dice string `json:"dice,omitempty"`
 }
 
 // RollVariant is a named bundle of dice the player can invoke before an action.
@@ -215,6 +221,53 @@ type Scenario struct {
 // for a Scenario. Returns true if the scenario changed.
 func MigrateScenarioDiceRules(sc *Scenario) bool {
 	return migrateDiceRulesLoreID(&sc.DiceRulesLoreID, &sc.DiceRules, sc.Lore)
+}
+
+// MigrateScenarioDice walks the scenario's roll variants and migrates legacy
+// "NdM" Dice strings into Count/Sides. Returns true if any spec changed.
+func MigrateScenarioDice(sc *Scenario) bool {
+	return migrateRollVariantsDice(sc.RollVariants)
+}
+
+var diceLegacyRE = regexp.MustCompile(`^(\d+)d(\d+)$`)
+
+// migrateDiceSpec parses a legacy "NdM" Dice string into Count/Sides and clears
+// the legacy field. Falls back to {1, 6} when the string is unparseable but
+// non-empty so the variant stays usable. Returns true when it touched anything.
+func migrateDiceSpec(d *DiceSpec) bool {
+	if d.Dice == "" {
+		return false
+	}
+	if d.Count == 0 && d.Sides == 0 {
+		if m := diceLegacyRE.FindStringSubmatch(strings.TrimSpace(d.Dice)); m != nil {
+			c, _ := strconv.Atoi(m[1])
+			s, _ := strconv.Atoi(m[2])
+			if c > 0 && s > 0 {
+				d.Count = c
+				d.Sides = s
+			}
+		}
+		if d.Count == 0 || d.Sides == 0 {
+			d.Count = 1
+			d.Sides = 6
+		}
+	}
+	d.Dice = ""
+	return true
+}
+
+// migrateRollVariantsDice walks every die in every variant and runs
+// migrateDiceSpec. Returns true if any spec changed.
+func migrateRollVariantsDice(variants []RollVariant) bool {
+	changed := false
+	for i := range variants {
+		for j := range variants[i].Dice {
+			if migrateDiceSpec(&variants[i].Dice[j]) {
+				changed = true
+			}
+		}
+	}
+	return changed
 }
 
 // CombineActionAndRoll joins the player's typed action with the formatted roll
@@ -292,6 +345,9 @@ func (s *GameState) Migrate() bool {
 		changed = true
 	}
 	if migrateDiceRulesLoreID(&s.DiceRulesLoreID, &s.DiceRules, s.Lore) {
+		changed = true
+	}
+	if migrateRollVariantsDice(s.RollVariants) {
 		changed = true
 	}
 	if s.Secs == nil {

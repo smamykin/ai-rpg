@@ -46,7 +46,8 @@ export interface Note {
 }
 
 export interface DiceSpec {
-  dice: string
+  count: number
+  sides: number
   type: string
 }
 
@@ -257,7 +258,15 @@ export function validateScenario(obj: unknown): Scenario | null {
       const dice = Array.isArray(v.dice)
         ? (v.dice as unknown[]).filter(d => d && typeof d === 'object').map(d => {
           const ds = d as Record<string, unknown>
-          return { dice: asString(ds.dice), type: asString(ds.type) }
+          // New shape: count + sides numbers. Legacy: a "NdM" dice string.
+          let count = typeof ds.count === 'number' ? ds.count : 0
+          let sides = typeof ds.sides === 'number' ? ds.sides : 0
+          if ((!count || !sides) && typeof ds.dice === 'string' && ds.dice) {
+            const m = /^(\d+)d(\d+)$/.exec(ds.dice.trim())
+            if (m) { count = parseInt(m[1], 10); sides = parseInt(m[2], 10) }
+          }
+          if (!count || !sides) { count = 1; sides = 6 }
+          return { count, sides, type: asString(ds.type) }
         })
         : []
       return {

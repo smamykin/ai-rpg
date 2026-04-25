@@ -90,6 +90,9 @@ func (s *ScenarioStore) Get(id string) (*game.Scenario, error) {
 	if game.MigrateScenarioDiceRules(&sc) {
 		changed = true
 	}
+	if game.MigrateScenarioDice(&sc) {
+		changed = true
+	}
 	if changed {
 		_ = s.write(&sc)
 	}
